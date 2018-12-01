@@ -59,12 +59,15 @@ Two ways of installation are possible (both require R package [devtools](https:/
 
 2. from source: clone repository - by default to directory: copulahic, cd to directory containing cloned repo, open R and run:
  
-        devtools::install("copulahic")
+    ```r
+    devtools::install("copulahic")
+    ```
     
 ## Usage ##
 -----------
 
 Import CopulaHiC package and list functions inside it:
+
 ```r
 library("CopulaHiC")
 getNamespaceExports("CopulaHiC")
@@ -78,37 +81,45 @@ CopulaHiC package contains sample data of Hi-C contact maps and TADs. Both of th
 
     * Hi-C contact maps npz files
 
-            # file name of MSC-HindIII-1_40kb-raw_maps
-            mtx.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
-            # file name of IMR90-MboI-1_40kb-raw_maps
-            mtx.fname.imr90 <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
-            # load data
-            maps.msc <- read_npz(mtx.fname.msc)
-            maps.imr90 <- read_npz(mtx.fname.msc)
+        ```r
+        # file name of MSC-HindIII-1_40kb-raw_maps
+        mtx.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+        # file name of IMR90-MboI-1_40kb-raw_maps
+        mtx.fname.imr90 <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+        # load data
+        maps.msc <- read_npz(mtx.fname.msc)
+        maps.imr90 <- read_npz(mtx.fname.msc)
+        ```
 
     * TADs csv files
 
-            # file name of MSC-HindIII-1_40kb-raw_tads
-            tads.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "CopulaHiC", mustWork = TRUE)
-            # load data
-            tads.msc <- read.csv(tads.fname.msc)
+        ```r
+        # file name of MSC-HindIII-1_40kb-raw_tads
+        tads.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "CopulaHiC", mustWork = TRUE)
+        # load data
+        tads.msc <- read.csv(tads.fname.msc)
+        ```
 
 2. list with Hi-C contact maps and TADs available in package environment:
 
     * Hi-C contact maps
 
-            # list available Hi-C maps
-            print(names(CopulaHiC::sample_hic_maps))
-            # get one
-            map.imr90 <- CopulaHiC::sample_hic_maps[["IMR90-MboI-1_40kb-raw"]]
-            print(names(map.imr90))
-            print(head(map.imr90[["18"]]))
+        ```r
+        # list available Hi-C maps
+        print(names(CopulaHiC::sample_hic_maps))
+        # get one
+        map.imr90 <- CopulaHiC::sample_hic_maps[["IMR90-MboI-1_40kb-raw"]]
+        print(names(map.imr90))
+        print(head(map.imr90[["18"]]))
+        ```
 
     * TADs
 
-            # list available TADs
-            print(names(CopulaHiC::sample_tads))
-            # get one
-            tads.imr90 <- CopulaHiC::sample_tads[["IMR90-MboI-1_40kb-raw"]]
-            print(head(tads.imr90))
+        ```r
+        # list available TADs
+        print(names(CopulaHiC::sample_tads))
+        # get one
+        tads.imr90 <- CopulaHiC::sample_tads[["IMR90-MboI-1_40kb-raw"]]
+        print(head(tads.imr90))
+        ```
 
