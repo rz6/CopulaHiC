@@ -5,7 +5,7 @@ Authors: Rafal Zaborowski, Bartek Wilczynski
 
 Institution: Faculty of Mathematics, Informatics and Mechanics, University of Warsaw, Poland
 
-License: MIT
+License: MIT + file LICENSE
 
 For more information please contact r.zaborowski@mimuw.edu.pl or bartek@mimuw.edu.pl
 
