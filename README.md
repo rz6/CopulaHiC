@@ -14,7 +14,7 @@ For more information please contact r.zaborowski@mimuw.edu.pl or bartek@mimuw.ed
 
 CopulaHiC is R package for differential analysis of Hi-C data. It takes advantage of significant correlations of main diagonals between different Hi-C data sets (cell lines, experiments, etc.) - usually first 200 to 300 diagonals from main diagonal are considered. CopulaHiC uses copulas to model these dependancies and then quantifies deviatons from the model in a probabilistic way. The only required input are raw Hi-C contact maps files in numpy [npz](https://kite.com/python/docs/numpy.lib.npyio.NpzFile) format.
 
-For more details, examples and quick start refer to vignette. You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`)
+For more details, examples and quick start refer to vignette (CopulaHiC_vignette.html file). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual (CopulaHiC.pdf file).
 
 The indepth description of our model together with detailed analysis and motivation will be described in manuscript (in preparation - available soon).
 
@@ -53,7 +53,9 @@ Two ways of installation are possible (both require R package [devtools](https:/
 
 1. from github repository:
 
-        devtools::install_github("rz6/CopulaHiC")
+    ```r
+    devtools::install_github("rz6/CopulaHiC")
+    ```
 
 2. from source: clone repository - by default to directory: copulahic, cd to directory containing cloned repo, open R and run:
  
