@@ -415,12 +415,12 @@ compartment_ranges <- function(pc){
         c(min(y),max(y))
       }) %>% t() %>%
       as.data.frame() %>%
-      set_colnames(c("start","end")) %>%
-      inset("compartment", value = x)
+      magrittr::set_colnames(c("start","end")) %>%
+      magrittr::inset("compartment", value = x)
   }) %>%
     do.call("rbind",.) -> df
   df[order(df$start, df$end), ] %>%
-    set_rownames(NULL)
+    magrittr::set_rownames(NULL)
 }
 
 #' Matches compartment with entries of contact map given in sparse format.
@@ -683,7 +683,7 @@ interactions2tads <- function(mtx.sparse, tads, cols = c("val")){
     boundaries[x]
   })
   merged <- merge(cell.tad, tads.parsed, by = c("start")) %>%
-    extract(c(c("i","j","tad.id","start","end"), cols))
+    magrittr::extract(c(c("i","j","tad.id","start","end"), cols))
   stopifnot(all((merged$i >= merged$start) & (merged$i <= merged$end)))
   stopifnot(all((merged$j >= merged$start) & (merged$j <= merged$end)))
   return(merged)
@@ -767,12 +767,12 @@ best_fit_bilinear <- function(x.vec, y.vec, truncate.left = 0, truncate.right = 
   xr <- which(dev.r <= 0)[1]
 
   # format result result
-  intersection.x <- set_names(c(xl, xi, xr), c("left", "both", "right"))
+  intersection.x <- magrittr::set_names(c(xl, xi, xr), c("left", "both", "right"))
   coefs <- matrix(c(a.left, b.left, a.right, b.right), ncol = 2, byrow = TRUE)
   colnames(coefs) <- c("intercept", "slope")
   rownames(coefs) <- c("left", "right")
   # return result
-  set_names(list(coefs, intersection.x), c("coefficients", "intersection.x"))
+  magrittr::set_names(list(coefs, intersection.x), c("coefficients", "intersection.x"))
 }
 
 #' Finds local maximas indices.

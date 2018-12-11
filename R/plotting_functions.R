@@ -289,7 +289,7 @@ plot_regions <- function(regions, pal.colors = NULL){
   if(ncol(regions) == 4){
     regions <- cbind(regions, rep("significant regions", nrow(regions)))
   }
-  regions <- set_colnames(as.data.frame(regions), c("xs","xe","ys","ye","category"))
+  regions <- magrittr::set_colnames(as.data.frame(regions), c("xs","xe","ys","ye","category"))
   l <- split(regions, regions$category)
   for(i in seq(1,length(l))){
     df <- l[[i]]
