@@ -51,22 +51,22 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
   names.sizes <- intersect(names(sizes1), names(sizes2))
   sizes <- lapply(names.sizes, function(x){
     rbind(
-      sizes1 %>% extract2(x) %>% set_rownames(data.names[1]),
-      sizes2 %>% extract2(x) %>% set_rownames(data.names[2])
+      sizes1 %>% magrittr::extract2(x) %>% magrittr::set_rownames(data.names[1]),
+      sizes2 %>% magrittr::extract2(x) %>% magrittr::set_rownames(data.names[2])
     )
-  }) %>% set_names(names.sizes)
+  }) %>% magrittr::set_names(names.sizes)
   # do PCA and get first principal component to annotate cells with A/B compartments
   if(do.pca){
     names(maps1) %>%
       lapply(function(x){
         sparse2dense(maps1[[x]], N = sizes[[x]][data.names[1], "n.rows"]) %>%
-          do_pca() %>% use_series("x") %>% extract(,"PC1")
-      }) %>% set_names(names(maps1)) -> maps1.pc1
+          do_pca() %>% magrittr::use_series("x") %>% magrittr::extract(,"PC1")
+      }) %>% magrittr::set_names(names(maps1)) -> maps1.pc1
     names(maps2) %>%
       lapply(function(x){
         sparse2dense(maps2[[x]], N = sizes[[x]][data.names[2], "n.rows"]) %>%
-          do_pca() %>% use_series("x") %>% extract(,"PC1")
-      }) %>% set_names(names(maps2)) -> maps2.pc1
+          do_pca() %>% magrittr::use_series("x") %>% magrittr::extract(,"PC1")
+      }) %>% magrittr::set_names(names(maps2)) -> maps2.pc1
   } else {
     maps1.pc1 <- NULL
     maps2.pc1 <- NULL
@@ -85,7 +85,6 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
       })
     } else if(which.tads == 3){
       # get intersection and then
-      # TODO: implement method for TAD intersection
       domains <- lapply(intersect(names(maps1), names(maps2)), function(x){
         sparse2dense(maps1[[x]], N = sizes[[x]][data.names[1], "n.rows"]) %>%
           map2tads() -> t1
@@ -107,7 +106,7 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
 
   structure(
     list(maps1, maps2, maps1.pc1, maps2.pc1, domains, data.names, sizes) %>%
-      set_names(c("maps1", "maps2", "pc1.maps1", "pc1.maps2", "tads", "data.names", "maps.dims")),
+      magrittr::set_names(c("maps1", "maps2", "pc1.maps1", "pc1.maps2", "tads", "data.names", "maps.dims")),
     class = "HiCcomparator"
   )
 }
@@ -150,14 +149,14 @@ merge.HiCcomparator <- function(x, include.zero.cells = FALSE){
     cbind(
       merged,
       pc2mtx(x$pc1.maps1[[y]], merged) %>%
-        extract(cn) %>% set_colnames(paste(cn,"x",sep = ".")),
+        magrittr::extract(cn) %>% magrittr::set_colnames(paste(cn,"x",sep = ".")),
       pc2mtx(x$pc1.maps2[[y]], merged) %>%
-        extract(cn) %>% set_colnames(paste(cn,"y",sep = "."))
-    ) %>% inset(c("one.compartment.x", "one.compartment.y"), value = "+") -> merged
+        magrittr::extract(cn) %>% magrittr::set_colnames(paste(cn,"y",sep = "."))
+    ) %>% magrittr::inset(c("one.compartment.x", "one.compartment.y"), value = "+") -> merged
     merged[merged$compartment.x == "AB", "one.compartment.x"] <- "-"
     merged[merged$compartment.y == "AB", "one.compartment.y"] <- "-"
     return(merged)
-  }) %>% set_names(maps.names)
+  }) %>% magrittr::set_names(maps.names)
 }
 
 #' @export
@@ -200,12 +199,12 @@ dominating_signal.HiCcomparator <- function(hic.comparator, which.signal = c("co
   f <- formula(paste0(". ~ ",variable))
   lapply(names(hic.comparator$maps1), function(n){
     agg <- aggregate(f, data = hic.comparator$maps1[[n]][c(variable,"val")], FUN = function(x){ c(sum.contacts = sum(x), mean.contacts = mean(x), sd.contacts = sd(x)) }) %>%
-      inset("name", value = n)
-  }) %>% do.call("rbind",.) %>% inset("dataset", value = data.names[1]) -> signal1
+      magrittr::inset("name", value = n)
+  }) %>% do.call("rbind",.) %>% magrittr::inset("dataset", value = data.names[1]) -> signal1
   lapply(names(hic.comparator$maps2), function(n){
     agg <- aggregate(f, data = hic.comparator$maps2[[n]][c(variable,"val")], FUN = function(x){ c(sum.contacts = sum(x), mean.contacts = mean(x), sd.contacts = sd(x)) }) %>%
-      inset("name", value = n)
-  }) %>% do.call("rbind",.) %>% inset("dataset", value = data.names[2]) -> signal2
+      magrittr::inset("name", value = n)
+  }) %>% do.call("rbind",.) %>% magrittr::inset("dataset", value = data.names[2]) -> signal2
   signal <- rbind(signal1, signal2)
   cbind(signal[,-2], signal[,2])
 }
@@ -258,8 +257,8 @@ decay_correlation.HiCcomparator <- function(hic.comparator){
       }
       c(as.numeric(d), as.vector(cors))
     }) %>% t() %>% as.data.frame() %>%
-      set_colnames(c("diagonal","pcc","pearson.pval","rho","spearman.pval","tau","kendall.pval")) %>%
-      inset("name", value = n)
+      magrittr::set_colnames(c("diagonal","pcc","pearson.pval","rho","spearman.pval","tau","kendall.pval")) %>%
+      magrittr::inset("name", value = n)
   }) %>% do.call("rbind",.)
 }
 
@@ -331,7 +330,7 @@ HiCcopula <- function(hic.comparator, diagonals = 0.12, include.zero.cells = FAL
         # - marginal distribution of Y
         # - best fit copula
         list(marginal.x, marginal.y, bf.copula) %>%
-          set_names(c("marginal.x", "marginal.y", "bf.copula"))
+          magrittr::set_names(c("marginal.x", "marginal.y", "bf.copula"))
       }, error = function(cond){
         # if any error occur return NULL for this diagonal, then one can
         # check in resulting list, for which diagonals error occured:
@@ -513,11 +512,11 @@ hicdiff.HiCcopula <- function(hic.copula, marginal.distr = c("fit","obs")[1]){
       } else {
         # calculate observed probability for vector of counts for x
         counts.x <- as.data.frame(table(as.factor(merged.diagonal$val.x)))
-        counts.x$Freq %>% divide_by(sum(counts.x$Freq)) %>% set_names(counts.x$Var1) -> pobs.x
+        counts.x$Freq %>% divide_by(sum(counts.x$Freq)) %>% magrittr::set_names(counts.x$Var1) -> pobs.x
         u <- pobs.x[as.character(merged.diagonal$val.x)]
         # calculate observed probability for vector of counts for y
         counts.y <- as.data.frame(table(as.factor(merged.diagonal$val.y)))
-        counts.y$Freq %>% divide_by(sum(counts.y$Freq)) %>% set_names(counts.y$Var1) -> pobs.y
+        counts.y$Freq %>% divide_by(sum(counts.y$Freq)) %>% magrittr::set_names(counts.y$Var1) -> pobs.y
         v <- pobs.y[as.character(merged.diagonal$val.y)]
       }
       uv <- data.frame(u = u, v = v, idx = rownames(merged.diagonal))
@@ -646,17 +645,17 @@ differential_interactions.HiCcopula <- function(hic.copula, plot.models = TRUE){
       sapply(l[[1]], function(cc){
         c(nrow(cc), min(cc[,"col"]), max(cc[,"col"]), min(cc[,"row"]), max(cc[,"row"]))
       }) %>% t() %>% as.data.frame() %>%
-        set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
-        inset("effect", value = "depletion") %>% set_rownames(ids.neg),
+        magrittr::set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
+        magrittr::inset("effect", value = "depletion") %>% magrittr::set_rownames(ids.neg),
       sapply(l[[2]], function(cc){
         c(nrow(cc), min(cc[,"col"]), max(cc[,"col"]), min(cc[,"row"]), max(cc[,"row"]))
       }) %>% t() %>% as.data.frame() %>%
-        set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
-        inset("effect", value = "enrichment") %>% set_rownames(ids.pos)
+        magrittr::set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
+        magrittr::inset("effect", value = "enrichment") %>% magrittr::set_rownames(ids.pos)
     )
     # get list with connected components
-    res.cc <- c(set_names(l[[1]], ids.neg), set_names(l[[2]], ids.pos))
+    res.cc <- c(magrittr::set_names(l[[1]], ids.neg), magrittr::set_names(l[[2]], ids.pos))
     list(res.df, res.cc) %>%
-      set_names(c("interacting.regions", "connected.components"))
-  }) %>% set_names(names(maps.difference))
+      magrittr::set_names(c("interacting.regions", "connected.components"))
+  }) %>% magrittr::set_names(names(maps.difference))
 }
