@@ -155,6 +155,7 @@ sparse2dense <- function(sparse.as.df, N = NULL, balancing = TRUE, missing.cells
 #'
 #' @param A matrix
 #' @param k integer diagonal to be sliced, 1 is main diagonal, positive k will yield diagonals from lower triangular matrix while negative k will yield diagonals from upper triangular
+#' @param return.idx logical whether to return indices of this diagonal
 #'
 #' @return numeric, vector containing entries on k-th diagonal of matrix A
 #'
@@ -165,7 +166,7 @@ sparse2dense <- function(sparse.as.df, N = NULL, balancing = TRUE, missing.cells
 #' superdiag(mtx, k = -2)
 #'
 #' @export
-superdiag <- function(A, k){
+superdiag <- function(A, k, return.idx = FALSE){
   stopifnot(k != 0)
   if(k < 0){
     A <- t(A)
@@ -176,6 +177,9 @@ superdiag <- function(A, k){
   i <- 1:len
   j <- k:n
   indices <- (j - 1) * n + i
+  if(return.idx){
+    return(indices)
+  }
   return(A[indices])
 }
 
