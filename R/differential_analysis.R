@@ -580,10 +580,20 @@ differential_interactions <- function(x, ...) UseMethod("differential_interactio
 #'  \item{}{then it takes negative log10 p-value vector of cells, sorts it, divides on negative and positive parts and lastly fits bilinear model to each of them}
 #'  \item{}{finally it retains only those cells that are to the left (right) of intersection point of bilinear model in positive (negative) p-values vector and searches for connected components in both of them separately}
 #' }
-#' Fitting bilinear model is performed using \code{\link{best_fit_bilinear}} function, while for connected components search \code{\link{raster}} package is used. After detection of significantly interacting regions (connected components) one may further filter list to only retain those with number of non zero cells (n.cells column in interacting.regions data frame) larger than some threshold.
+#' Fitting bilinear model is performed using \code{\link{best_fit_bilinear}} function, while for connected components search \code{\link{raster}} package is used. After detection of significantly interacting regions (connected components) one may further filter list to only retain those with number of non zero cells (n.cells column in interacting.regions data frame) larger than some threshold. There are 3 possible ways of selecting significant interactions (cells):
+#' \itemize{
+#'  \item{}{bilinear model is used to determine significance threshold and then this threshold is compared with \code{pval} parameter - if threshold is less significant than \code{pval} then threshold is substituted with \code{pval} - this is the default behaviour,}
+#'  \item{}{only \code{pval} is used as a significance threshold, i.e. hard thresholding,}
+#'  \item{}{only bilinear model is used to determine significance threshold (unrecomended, as it may yield non significant interactions).}
+#' }
+#' When using option 1 and 3 its recommended to plot the fit (enabled by default). An indication of properly determined significance threshold would be when red vertical line (the significance threshold) is located to the right side of grey vertical line.
 #'
 #' @param hic.copula object of class HiCcopula
 #' @param plot.models logical if true then plot bilinear model fit for every matrix in hic.copula object; it will plot models for depleted and enriched models separately; if you want to save this results to file open device before calling this function (see for instance \code{\link{pdf}}) and close device after function call (see \code{\link{dev.off}})
+#' @param pval numeric, p-value cutoff to qualify interaction as significant
+#' @param sig.thr.selection numeric, if 3 then only use bilinear model fit to establish p-value cutoff for significant interactions, if 2 then select significant interactions using only \code{pval} parameter, if 1 (default) use bilinear model, but if p-value threshold is larger than \code{pval}, use \code{pval} instead
+#' @param which.significance character either "qval" or "pval" indicating, which of the 2 shold be used as a measure of interaction significance
+#' @param cc.direction specifies criterium for two cells to be considered as neighbors during connected components search, for details see \code{directions} parameter of \code{\link{raster::clump}} function
 #'
 #' @return list with number of entries equal to hic.copula$names; each entry is a list with 2 elements: interacting.regions - data frame containing rows with rectangle like regions of significant interactions with coordinates n.cells (number of non zero cells inside rectangle), start.x, end.x, start.y, end.y, effect; connected.components list with cells comprising given connected component; connected components list is named list where each entry name is unique id, which can be mapped to row in interacting.regions (its row names)
 #'
@@ -599,44 +609,75 @@ differential_interactions <- function(x, ...) UseMethod("differential_interactio
 #' plot_regions(di18[di18$n.cells >= 10,2:6], pal.colors = c("blue","red"))
 #'
 #' @export
-differential_interactions.HiCcopula <- function(hic.copula, plot.models = TRUE){
+differential_interactions.HiCcopula <- function(hic.copula, plot.models = TRUE, pval = 0.05, sig.thr.selection = c(1,2,3)[1], which.significance = c("qval","pval")[1], cc.direction = c(4,8)[1]){
   maps.difference <- hicdiff(hic.copula)
   lapply(names(maps.difference), function(n){
-    df <- maps.difference[[n]]
-    df$neg.log.cor.pval <- -log10(df$p.value.corrected)
-    df[df$effect == "depletion","neg.log.cor.pval"] <- -df[df$effect == "depletion","neg.log.cor.pval"]
-    df <- df[order(df$neg.log.cor.pval),]
-    df$X <- seq(1, nrow(df))
-    list(df[df$neg.log.cor.pval < 0,], df[df$neg.log.cor.pval > 0,]) %>%
-      lapply(function(sgn.df){
-        bf <- best_fit_bilinear(sgn.df$X, sgn.df$neg.log.cor.pval)
-        x <- bf[["intersection.x"]]["both"]
-        # get left and right tails of p-values
-        v <- abs(c(sgn.df$neg.log.cor.pval[1], tail(sgn.df$neg.log.cor.pval, 1)))
-        if(v[1] > v[2]){
-          most.significant <- sgn.df[sgn.df$X < x,]
-        } else {
-          most.significant <- sgn.df[sgn.df$X > x,]
+    columns <- c("i","j","effect", ifelse(which.significance == "qval", "p.value.corrected", "p.value"))
+    df <- magrittr::set_colnames(maps.difference[[n]][columns], c("i", "j", "effect", "significance"))
+    df$significance <- -log10(df$significance)
+    sig.thr <- -log10(pval)
+    # group significantly depleted and enriched cells
+    by(df, df$effect, function(df.effect){
+      # get appropriate data frame
+      dfe <- cbind(df.effect[order(df.effect$significance),], X = seq(1, nrow(df.effect)))
+      # find parameter pval based threshold
+      x <- dfe[dfe$significance >= sig.thr, "X"][1]
+      if(sig.thr.selection != 2){
+        # fit bilinear model
+        bf <- best_fit_bilinear(dfe$X, dfe$significance)
+        x.bm <- bf[["intersection.x"]]["both"]
+        if(x.bm < x){
+          # bilinear model determined p-value lower than 0.05
+          if(sig.thr.selection == 1){
+            warning("Bilinear model determined less significant threshold than pval! Switching to pval!")
+            x.bm <- x
+          } else {
+            warning("Bilinear model determined less significant threshold than pval, but sig.thr.selection is set to 3! THIS WILL YIELD NON SIGNIFICANT INTERACTIONS, i.e. p-value > pval!")
+          }
         }
         if(plot.models){
-          plot(sgn.df$X, sgn.df$neg.log.cor.pval, cex = 0.1, xlab = "X", ylab = latex2exp::TeX("-log_{10}(p_{BH})"))
-          title(paste0(hic.copula$data.names[1]," vs ",hic.copula$data.names[2],", contact map ",n), cex.main = 1)
+          plot(dfe$X, dfe$significance, cex = 0.1, xlab = "X", ylab = latex2exp::TeX("-log_{10}(significance)"))
+          title(paste0(hic.copula$data.names[1]," vs ",hic.copula$data.names[2],", ",n,", ",dfe[1,"effect"]), cex.main = 1)
           abline(a = bf[["coefficients"]]["left","intercept"], b = bf[["coefficients"]]["left","slope"], col = "green")
           abline(a = bf[["coefficients"]]["right","intercept"], b = bf[["coefficients"]]["right","slope"], col = "blue")
-          abline(v = x, col = "red")
+          legend.labels = c("bilinear model fit 1","bilinear model fit 2")
+          colors.labels <- c("green","blue")
+          pval.bm <- formatC(10^(-dfe[dfe$X >= bf[["intersection.x"]]["both"],"significance"][1]), format = "e", digits = 2)
+          if(x != bf[["intersection.x"]]["both"]){
+            legend.labels <- c(legend.labels, paste0("p-value threshold = ",formatC(pval, format = "e", digits = 2)), paste0("intersection fit 1 vs 2, p-value = ", pval.bm))
+            colors.labels <- c(colors.labels, "red","gray")
+            if(sig.thr.selection == 3 | x < bf[["intersection.x"]]["both"]){
+              abline(v = x, col = "gray")
+              abline(v = bf[["intersection.x"]]["both"], col = "red")
+              legend.labels[3:4] <- legend.labels[4:3]
+            } else {
+              abline(v = x, col = "red")
+              abline(v = bf[["intersection.x"]]["both"], col = "gray")
+            }
+          } else {
+            abline(v = x, col = "red")
+            legend.labels <- c(legend.labels, paste0("intersection fit 1 vs 2, p-value = ", pval.bm))
+            colors.labels <- c(colors.labels, "red")
+          }
+          legend("topleft", legend = legend.labels, col = colors.labels, lty = rep(1, length(legend.labels)), bty = "n")
         }
-        adjacency <- sparse2dense(most.significant[c("i","j","neg.log.cor.pval")],
-                                  N = hic.copula$maps.dims[[n]][1,1])
-        # convert negative or positive matrix of negative log p-values into adjacency matrix
-        adjacency[adjacency != 0] <- 1
-        rmat <- raster::raster(adjacency)
-        clumps <- matrix(raster::clump(rmat, directions=4),
-                         nrow = nrow(adjacency), ncol = ncol(adjacency), byrow = TRUE)
-        # get connected components as list
-        lapply(seq(1, max(clumps, na.rm=TRUE)), function(m){
-          which(clumps == m, arr.ind = TRUE)
-        })
-      }) -> l
+        x <- x.bm
+      }
+      most.significant <- dfe[dfe$X >= x,]
+      # connected components determination
+      adjacency <- sparse2dense(most.significant[c("i","j","significance")],
+                                N = hic.copula$maps.dims[[n]][1,1])
+      # convert negative or positive matrix of negative log p-values into adjacency matrix
+      adjacency[adjacency != 0] <- 1
+      rmat <- raster::raster(adjacency)
+      clumps <- matrix(raster::clump(rmat, directions = cc.direction),
+                       nrow = nrow(adjacency), ncol = ncol(adjacency), byrow = TRUE)
+      # get connected components as list
+      lapply(seq(1, max(clumps, na.rm = TRUE)), function(m){
+        which(clumps == m, arr.ind = TRUE)
+      })
+    }, simplify = FALSE) -> l
+
     ids <- seq(1, length(l[[1]]) + length(l[[2]]))
     ids.neg <- ids[1:length(l[[1]])]
     ids.pos <- ids[(length(l[[1]]) + 1):length(ids)]

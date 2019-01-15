@@ -878,7 +878,7 @@ right.min <- function(v){
 
 #' Determines TAD boundaries using Insulation Score.
 #'
-#' For details on Insulation Score approach of TAD boundaries detection see Crane et al. 2015 "Condensin-driven remodelling of X chromosome topology during dosage compensation", this function is implementation of \url{http://bioinformaticsinstitute.ru/sites/default/files/tad_calling_methods_part_1_-_sidorov_16-dec-2016.pdf} with minor adaptations to handle missing values.
+#' For details on Insulation Score approach of TAD boundaries detection see Crane et al. 2015 "Condensin-driven remodelling of X chromosome topology during dosage compensation" methods section, paragraph TAD calling (insulation square analysis).
 #'
 #' @param dense.mtx numeric matrix in dense format representing Hi-C contact map
 #' @param resolution numeric resolution of Hi-C contact map in base pairs
@@ -898,39 +898,36 @@ right.min <- function(v){
 #' plot_regions(tads)
 #'
 #' @export
-map2tads <- function(dense.mtx, resolution = 40000, window.bp = 1000 * 1000, delta.bp = 200 * 1000){
+map2tads <- function(dense.mtx, resolution = 40000, window.bp = 500 * 1000, delta.bp = 100 * 1000, without_unmappable = TRUE){
   w.bins <- window.bp / resolution
   d.bins <- delta.bp / resolution
-  unmappable <- remove_unmappable(dense.mtx)
-  mtx <- unmappable[["matrix"]]
-  N <- nrow(mtx)
+  N <- nrow(dense.mtx)
   bins <- seq(1,N)
-  # 1. get insulations scores, first w.bins will be equal to iscore[w.bins+1] and
-  # last w.bins wil be equal to iscore[N-w.bins] - to avoid NA, Nan, Inf values
-  iscore <- sapply(bins[(w.bins+1):(N-w.bins)], function(i){
-    mean(mtx[(i-w.bins):i-1, (i+1):(i+w.bins)], na.rm = TRUE)
-  })
-  iscore <- c(rep(iscore[1], w.bins), iscore, rep(iscore[length(iscore)], w.bins))
+  # 1. get insulations scores
+  sapply(bins[(w.bins+1):(N-w.bins)], function(i){
+    mean(dense.mtx[(i-w.bins):i-1, (i+1):(i+w.bins)], na.rm = TRUE)
+  }) -> iscore
   mean.is <- mean(iscore, na.rm = TRUE)
+  # below may have -Inf where iscore == 0
   normalized.is <- log2(iscore / mean.is)
+  # so replace -Inf with the smallest value from normalized.is (but not -Inf) times 2
+  normalized.is[normalized.is == -Inf] <- min(normalized.is[normalized.is != -Inf]) * 2
   # 2. get deltas
-  sapply(bins[2:(length(bins)-1)], function(i){
+  n <- length(normalized.is)
+  sapply(1:n, function(i){
     l.idx <- seq(i-w.bins, i-1)
     r.idx <- seq(i+1, i+1+w.bins)
-    mean(normalized.is[l.idx[l.idx > 0]], na.rm = TRUE) -
-      mean(normalized.is[r.idx[r.idx <= N]], na.rm = TRUE)
-  }) -> deltas
-  deltas <- c(deltas[1], deltas, deltas[length(deltas)])
-  # get gaps, i.e. intervals with NA and convert them to what is on the left side
-  non.na <- which(!is.na(deltas))
-  l <- which(diff(non.na) != 1)
-  starts <- non.na[l]
-  ends <- non.na[l+1] - 1
-  if(length(starts) > 0){
-    for(j in seq(1,length(starts))){
-      deltas[(starts[j]+1):ends[j]] <- starts[j]
+    if(i == 1){
+      -mean(normalized.is[r.idx[r.idx <= N]], na.rm = TRUE)
+    } else if(i == n){
+      mean(normalized.is[l.idx[l.idx > 0]], na.rm = TRUE)
+    } else{
+      mean(normalized.is[l.idx[l.idx > 0]], na.rm = TRUE) - mean(normalized.is[r.idx[r.idx <= N]], na.rm = TRUE)
     }
-  }
+  }) -> deltas
+  # append NA for first and last window bins
+  na.bins <- rep(NA, w.bins)
+  deltas <- c(na.bins, deltas, na.bins)
   # 3. get minimum insulation score
   # get indices of delta closest to 0
   idx <- which(diff(sign(deltas)) != 0)
@@ -941,13 +938,21 @@ map2tads <- function(dense.mtx, resolution = 40000, window.bp = 1000 * 1000, del
     c(i, left.max(deltas[1:i]), right.min(deltas[i:N]))
   }) -> Si
   # now get only these indices for which deltaMax - deltaMin > 0.1
-  boundaries <- unique(c(1, Si[1, which((Si[2,] - Si[3,]) > 0.1)], length(deltas)))
-  v <- rep(NA, length(deltas))
-  v[boundaries] <- 1
-  v.restored <- restore_unmappable_vec(v, unmappable[["indices.rows"]])
-  br <- which(!is.na(v.restored))
-  # convert to data frame
-  data.frame(start = c(br[1], br[2:(length(br)-1)] + 1), end = br[2:length(br)])
+  boundaries <- Si[1, which((Si[2,] - Si[3,]) > 0.1)]
+  tads <- data.frame(start = boundaries[1:(length(boundaries)-1)], end = boundaries[2:length(boundaries)])
+  if(without_unmappable){
+    unmappable_idx <- remove_unmappable(dense.mtx)[["indices.rows"]]
+    split(unmappable_idx, cumsum(c(1, diff(unmappable_idx) != 1))) %>%
+      sapply(FUN = function(v){ c(min(v),max(v)) }) %>% as.vector() -> unmappable_boundaries
+    c(1, unmappable_boundaries, nrow(dense.mtx)) %>%
+      matrix(ncol = 2, byrow = TRUE) -> mappable
+    boundaries <- sort(c(boundaries, unmappable_boundaries))
+    lapply(1:nrow(mappable), function(x){
+      b <- boundaries[(boundaries >= mappable[x,1]) & (boundaries <= mappable[x,2])]
+      data.frame(start = b[1:(length(b)-1)], end = b[2:length(b)])
+    }) %>% do.call("rbind",.) -> tads
+  }
+  return(tads)
 }
 
 #' Finds intersection between 2 sets of TADs.

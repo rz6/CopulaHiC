@@ -4,8 +4,8 @@
 \alias{map2tads}
 \title{Determines TAD boundaries using Insulation Score.}
 \usage{
-map2tads(dense.mtx, resolution = 40000, window.bp = 1000 * 1000,
-  delta.bp = 200 * 1000)
+map2tads(dense.mtx, resolution = 40000, window.bp = 500 * 1000,
+  delta.bp = 100 * 1000, without_unmappable = TRUE)
 }
 \arguments{
 \item{dense.mtx}{numeric matrix in dense format representing Hi-C contact map}
@@ -20,7 +20,7 @@ map2tads(dense.mtx, resolution = 40000, window.bp = 1000 * 1000,
 data frame with TAD positions containing start, end columns
 }
 \description{
-For details on Insulation Score approach of TAD boundaries detection see Crane et al. 2015 "Condensin-driven remodelling of X chromosome topology during dosage compensation", this function is implementation of \url{http://bioinformaticsinstitute.ru/sites/default/files/tad_calling_methods_part_1_-_sidorov_16-dec-2016.pdf} with minor adaptations to handle missing values.
+For details on Insulation Score approach of TAD boundaries detection see Crane et al. 2015 "Condensin-driven remodelling of X chromosome topology during dosage compensation" methods section, paragraph TAD calling (insulation square analysis).
 }
 \examples{
 # get Hi-C contact map
