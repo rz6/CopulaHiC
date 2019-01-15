@@ -1,6 +1,6 @@
 Package: CopulaHiC
 Type: Package
-Title: Joint normalization and detection of differential interactions in Hi-C data with copula modelling.
+Title: Normalization avoiding modelling and detection of differential interactions in Hi-C data via copula models.
 Version: 0.1.0
 Author: Rafal Zaborowski
 Maintainer: Rafal Zaborowski <r.zaborowski@mimuw.edu.pl>
@@ -23,7 +23,8 @@ Imports:
 Suggests:
 	ggplot2,
 	reshape2,
-    knitr,
-    rmarkdown
+	gridExtra,
+    	knitr,
+    	rmarkdown
 RoxygenNote: 6.1.1
 VignetteBuilder: knitr

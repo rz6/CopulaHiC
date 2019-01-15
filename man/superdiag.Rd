@@ -4,12 +4,14 @@
 \alias{superdiag}
 \title{Efficiently slices k-th diagonal from matrix A.}
 \usage{
-superdiag(A, k)
+superdiag(A, k, return.idx = FALSE)
 }
 \arguments{
 \item{A}{matrix}
 
 \item{k}{integer diagonal to be sliced, 1 is main diagonal, positive k will yield diagonals from lower triangular matrix while negative k will yield diagonals from upper triangular}
+
+\item{return.idx}{logical whether to return indices of this diagonal}
 }
 \value{
 numeric, vector containing entries on k-th diagonal of matrix A

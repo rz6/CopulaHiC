@@ -45,6 +45,7 @@ Following additional packages are required for examples and plotting:
 
 *  ggplot2
 *  reshape2
+*  gridExtra
 
 NOTE: Some of the above R packages require GSL (GNU Scientific Library). Before installation make sure that libgsl-dev is installed (`sudo apt-get install libgsl-dev` on Ubuntu).
 

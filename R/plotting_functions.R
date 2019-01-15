@@ -238,7 +238,7 @@ plot_pc_vector <- function(pc, colors=c("blue","red"), ...){
   y.neg <- pc
   y.pos[pc<0] <- 0
   y.neg[pc>0] <- 0
-  plot(pc~x, type="n", ...)
+  plot(pc~x, type="n", xaxs = "i", ...)
   grid()
   polygon(c(x[1],x,x[n]), c(0,y.pos,0), col=colors[1], border=NA)
   polygon(c(x[1],x,x[n]), c(0,y.neg,0), col=colors[2], border=NA)
