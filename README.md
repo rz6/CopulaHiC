@@ -18,6 +18,8 @@ For more details, examples and quick start refer to vignette (CopulaHiC_vignette
 
 The indepth description of our model together with detailed analysis and motivation will be described in manuscript (in preparation - available soon).
 
+NOTE: CopulaHiC_vignette.html file can't be properly rendered from within github. Therefore it is recommended to download the file (or just clone the repo) and then open it.
+
 ## Prerequisites ##
 -------------------
 

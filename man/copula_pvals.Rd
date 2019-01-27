@@ -30,7 +30,7 @@ NOTES:
   \item{}{both uv and model is for single (and the same) diagonal}
   \item{}{uv must all be points for either top left (depletion) or bottom right (enrichment) part of distribution}
 }
-For calculation of copula cdf \code{\link{VineCopula::::BiCopCDF}} is used.
+For calculation of copula cdf \code{\link{VineCopula::BiCopCDF}} is used.
 }
 \examples{
 library("copula")
