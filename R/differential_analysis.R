@@ -360,7 +360,7 @@ HiCcopula <- function(hic.comparator, diagonals = 0.12, include.zero.cells = FAL
 #'   \item{}{both uv and model is for single (and the same) diagonal}
 #'   \item{}{uv must all be points for either top left (depletion) or bottom right (enrichment) part of distribution}
 #' }
-#' For calculation of copula cdf \code{\link{VineCopula::::BiCopCDF}} is used.
+#' For calculation of copula cdf \code{\link{VineCopula::BiCopCDF}} is used.
 #'
 #' @param uv matrix of dimension n x 2 with U,V r.v. ~ Uniform(0,1), see \code{\link{VineCopula::pobs}} for generation of U,V from X,Y; here U,V matrix must be such that either U >= V (lower.right corner) or U <= V (upper.left corner)
 #' @param copula.model object of class \code{\link{VineCopula::BiCop}}
