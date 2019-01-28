@@ -316,27 +316,32 @@ HiCcopula <- function(hic.comparator, diagonals = 0.12, include.zero.cells = FAL
     }
     # calculate models for every diagonal
     parallel::mclapply(merged.n.diagonals[as.character(diagonals)], FUN = function(df){
-      tryCatch({
-        # fit gamma distribution for marginals
-        marginal.x <- fitdistrplus::fitdist(df$val.x, distr = "gamma", method = "mle")
-        marginal.y <- fitdistrplus::fitdist(df$val.y, distr = "gamma", method = "mle")
-        # find best fit copula
+      # fit gamma distribution for marginals
+      marginal.x <- tryCatch({
+        fitdistrplus::fitdist(df$val.x, distr = "gamma", method = "mle")
+      }, error = function(e){
+        NULL
+      })
+      marginal.y <- tryCatch({
+        fitdistrplus::fitdist(df$val.y, distr = "gamma", method = "mle")
+      }, error = function(e){
+        NULL
+      })
+      # find best fit copula
+      bf.copula <- tryCatch({
         pseudo.observations <- VineCopula::pobs(df[,c("val.x","val.y")])
         u <- pseudo.observations[,1]
         v <- pseudo.observations[,2]
-        bf.copula <- VineCopula::BiCopSelect(u,v, familyset = NA)
-        # return result as  list with:
-        # - marginal distribution of X
-        # - marginal distribution of Y
-        # - best fit copula
-        list(marginal.x, marginal.y, bf.copula) %>%
-          magrittr::set_names(c("marginal.x", "marginal.y", "bf.copula"))
-      }, error = function(cond){
-        # if any error occur return NULL for this diagonal, then one can
-        # check in resulting list, for which diagonals error occured:
-        # which(sapply(result, is.null))
-        return(NULL)
+        VineCopula::BiCopSelect(u,v, familyset = NA)
+      }, error = function(e){
+        NULL
       })
+      # return result as  list with:
+      # - marginal distribution of X
+      # - marginal distribution of Y
+      # - best fit copula
+      list(marginal.x, marginal.y, bf.copula) %>%
+        magrittr::set_names(c("marginal.x", "marginal.y", "bf.copula"))
     }, mc.cores = n.cores)
   }) %>% magrittr::set_names(names.merged) -> model
   # return result
@@ -502,27 +507,43 @@ hicdiff.HiCcopula <- function(hic.copula, marginal.distr = c("fit","obs")[1]){
     lapply(names(model), function(m){
       model.diagonal <- model[[m]]
       merged.diagonal <- merged.diagonals[[m]]
-      if(marginal.distr == "fit"){
-        # get gamma parameters
-        x.estimate <- model.diagonal$marginal.x[["estimate"]]
-        y.estimate <- model.diagonal$marginal.y[["estimate"]]
-        # calculate u, v
-        u <- pgamma(merged.diagonal$val.x, x.estimate["shape"], rate = x.estimate["rate"])
-        v <- pgamma(merged.diagonal$val.y, y.estimate["shape"], rate = y.estimate["rate"])
-      } else {
-        # calculate observed probability for vector of counts for x
-        counts.x <- as.data.frame(table(as.factor(merged.diagonal$val.x)))
-        counts.x$Freq %>% divide_by(sum(counts.x$Freq)) %>% magrittr::set_names(counts.x$Var1) -> pobs.x
-        u <- pobs.x[as.character(merged.diagonal$val.x)]
-        # calculate observed probability for vector of counts for y
-        counts.y <- as.data.frame(table(as.factor(merged.diagonal$val.y)))
-        counts.y$Freq %>% divide_by(sum(counts.y$Freq)) %>% magrittr::set_names(counts.y$Var1) -> pobs.y
-        v <- pobs.y[as.character(merged.diagonal$val.y)]
-      }
-      uv <- data.frame(u = u, v = v, idx = rownames(merged.diagonal))
-      pvals <- maps_difference_diagonal(uv, model.diagonal$bf.copula)
-      base::merge(merged.diagonal[c("i","j","name","val.x","val.y")],
-                  pvals, by.x = "row.names", by.y = "idx")
+      tryCatch({
+        if(marginal.distr == "fit"){
+          # get gamma parameters
+          x.estimate <- model.diagonal$marginal.x[["estimate"]]
+          y.estimate <- model.diagonal$marginal.y[["estimate"]]
+          # calculate u, v
+          u <- pgamma(merged.diagonal$val.x, x.estimate["shape"], rate = x.estimate["rate"])
+          v <- pgamma(merged.diagonal$val.y, y.estimate["shape"], rate = y.estimate["rate"])
+        } else {
+          # calculate observed probability for vector of counts for x
+          counts.x <- as.data.frame(table(as.factor(merged.diagonal$val.x)))
+          counts.x$Freq %>% divide_by(sum(counts.x$Freq)) %>% magrittr::set_names(counts.x$Var1) -> pobs.x
+          u <- pobs.x[as.character(merged.diagonal$val.x)]
+          # calculate observed probability for vector of counts for y
+          counts.y <- as.data.frame(table(as.factor(merged.diagonal$val.y)))
+          counts.y$Freq %>% divide_by(sum(counts.y$Freq)) %>% magrittr::set_names(counts.y$Var1) -> pobs.y
+          v <- pobs.y[as.character(merged.diagonal$val.y)]
+        }
+        uv <- data.frame(u = u, v = v, idx = rownames(merged.diagonal))
+        pvals <- maps_difference_diagonal(uv, model.diagonal$bf.copula)
+        base::merge(merged.diagonal[c("i","j","name","val.x","val.y")],
+                    pvals, by.x = "row.names", by.y = "idx")
+      }, error = function(e){
+        # one of the models is NULL
+        missing.models <- c()
+        if(is.null(model.diagonal$marginal.x)){
+          missing.models <- c(missing.models, "marginal x")
+        }
+        if(is.null(model.diagonal$marginal.y)){
+          missing.models <- c(missing.models, "marginal y")
+        }
+        if(is.null(model.diagonal$bf.copula)){
+          missing.models <- c(missing.models, "copula")
+        }
+        warning(paste0("On diagonal ",m," following models are missing: ", paste(missing.models, collapse = ", "), "... I am skipping this diagonal!"))
+        return(NULL)
+      })
     }) %>% do.call("rbind",.)
   }) %>% magrittr::set_names(hic.copula$names)
 }
