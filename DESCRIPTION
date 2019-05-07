@@ -1,6 +1,6 @@
-Package: CopulaHiC
+Package: DIADEM
 Type: Package
-Title: Normalization avoiding modelling and detection of differential interactions in Hi-C data via copula models.
+Title: Normalization avoiding modelling and detection of differential interactions in Hi-C data via GLM.
 Version: 0.1.0
 Author: Rafal Zaborowski
 Maintainer: Rafal Zaborowski <r.zaborowski@mimuw.edu.pl>
@@ -13,13 +13,13 @@ Imports:
 	reticulate,
 	Matrix,
 	fields,
-	fitdistrplus,
-	VineCopula,
 	parallel,
 	igraph,
 	raster,
 	latex2exp,
-	intervals
+	intervals,
+	robustreg,
+	MASS
 Suggests:
 	ggplot2,
 	reshape2,

@@ -183,6 +183,53 @@ superdiag <- function(A, k, return.idx = FALSE){
   return(A[indices])
 }
 
+#' Convert interactions into zscores
+#'
+#' Given single (i.e. one chromosome) contact map in sparse format convert its interactions into zscores diagonal-wise.
+#'
+#' @param mtx.sparse data frame representing contact map
+#' @param substitute.val logical indicating whether zscores should be substituted into val
+#'
+#' @return data frame with interaction zscores calculated over every diagonal separatelly
+#'
+#' @examples
+#'
+#' @export
+interactions2zscores <- function(mtx.sparse, substitute.val = TRUE){
+  if("name" %in% colnames(mtx.sparse)){
+    # check if single matrix
+    stopifnot(length(unique(as.character(mtx.sparse$name))) == 1)
+  }
+  by(mtx.sparse, mtx.sparse$diagonal, function(df){
+    if(substitute.val){
+      magrittr::inset(df, "val", value = base::scale(df$val)[,1])
+    } else {
+      magrittr::inset(df, "zscore.val", value = base::scale(df$val)[,1])
+    }
+  }) %>% do.call("rbind",.)
+}
+
+#' Calculate proportion of interactions
+#'
+#' Appends column with proportion of interactions per diagonal.
+#'
+#' @param mtx.sparse data frame representing contact map
+#'
+#' @return data frame with interactions proportion calculated over every diagonal separatelly
+#'
+#' @examples
+#'
+#' @export
+proportions <- function(mtx.sparse){
+  if("name" %in% colnames(mtx.sparse)){
+    # check if single matrix
+    stopifnot(length(unique(as.character(mtx.sparse$name))) == 1)
+  }
+  by(mtx.sparse, mtx.sparse$diagonal, function(df){
+    magrittr::inset(df, "prop", value = df$val / sum(df$val))
+  }) %>% do.call("rbind",.)
+}
+
 #' Removes unmappable regions (all zeros columns and rows) from dense matrix.
 #'
 #' @param dense.mtx numeric matrix (contact map) in dense format
@@ -277,7 +324,7 @@ restore_unmappable_mtx <- function(dense.mtx.mappable, idx.rows, idx.cols = NULL
 #'
 #' @examples
 #' # get sample npz file name
-#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' mtx.dense.list <- read_dense(mtx.fname) # reads all chromosomes
 #' # limiting number of chromosomes
 #' mtx.dense.sublist <- read_dense(mtx.fname, mtx.names = c("18","19")) # only read chromosome 18 and 19
@@ -310,7 +357,7 @@ read_dense <- function(path, mtx.names = "all"){
 #'
 #' @examples
 #' # get sample npz file name
-#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' mtx.sparse.list <- read_npz(mtx.fname) # reads all chromosomes
 #' mtx.sparse.sublist <- read_npz(mtx.fname, mtx.names = c("18","19")) # only read chromosome 18 and 19
 #'
@@ -346,7 +393,7 @@ read_npz <- function(path, mtx.names = "all", sparse.format = TRUE){
 #'
 #' @examples
 #' # get sample npz file name
-#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' mtx.dense.sublist <- read_dense(mtx.fname, mtx.names = c("18","19"))
 #' print(names(mtx.dense.sublist))
 #' print(typeof(mtx.dense.sublist))
@@ -373,7 +420,7 @@ save_npz <- function(mtx.list, path){
 #'
 #' @examples
 #' # get sample npz file name
-#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' sizes <- read_size(mtx.fname)
 #' print(sizes)
 #'
@@ -509,7 +556,7 @@ mean_expected <- function(dense.mtx){
 #' @examples
 #' # load Hi-C contact maps from npz file
 #' # get sample npz file name
-#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' mtx.sparse.list <- read_npz(mtx.fname, sparse.format = TRUE)
 #' # get matrix for selected chromosome
 #' mtx <- mtx.sparse.list[["18"]]
@@ -561,6 +608,79 @@ sparse2interactions <- function(sparse.mtx){
     magrittr::set_rownames(NULL)
 }
 
+#' Move contacts to given pair of interacting regions
+#'
+#' Randomly selects \code{N} contacts from \code{i} xor \code{j} bins of given \code{mtx.sparse} Hi-C contact map and moves them to cell (\code{i}, \code{j}). This method of producing artificial LRI preserves coverage of initial Hi-C contact map.
+#'
+#' @param mtx.sparse data frame - Hi-C contact map in sparse format with columns: i, j, val, diagonal, name
+#' @param i numeric first region (row of Hi-C contact map)
+#' @param j numeric second region (column of Hi-C contact map)
+#' @param N numeric number of contacts to be moved from regions \code{i} xor \code{j} to interaction (\code{i},\code{j})
+#'
+#' @return data frame with the same columns as \code{mtx.sparse}
+#'
+#' @export
+move_contacts <- function(mtx.sparse, i, j, N){
+  # select contacts for sampling, i.e.: i-th row xor j-th column
+  v <- xor(mtx.sparse$i == i, mtx.sparse$j == j)
+  contacts <- sparse2interactions(mtx.sparse[v,])
+  n <- nrow(contacts)
+  stopifnot(n > N)
+  remaining.contacts <- mtx.sparse[!v,]
+  sampled <- sample(seq(1, n), replace = FALSE, size = N)
+  not.sampled <- contacts[-sampled,]
+  sparse.not.sampled <- aggregate(N ~ ., data = transform(not.sampled, N = 1), FUN = length)
+  cn <- colnames(sparse.not.sampled)
+  colnames(sparse.not.sampled)[which(cn == "N")] <- "val"
+  remaining.contacts[(remaining.contacts$i == i) & (remaining.contacts$j == j),"val"] <- remaining.contacts[(remaining.contacts$i == i) & (remaining.contacts$j == j),"val"] + N
+  rbind(
+    remaining.contacts,
+    sparse.not.sampled[c("i","j","val","diagonal","name")]
+  )
+}
+
+#' Produce artificial long range interactions
+#'
+#' Produces artificial long range interactions by randomly moving contacts to given interacting regions.
+#'
+#' @param mtx.sparse data frame - Hi-C contact map in sparse format with columns: i, j, val, diagonal, name
+#' @param interactions data frame with i, j, N columns indicating where (\code{i}, \code{j}) to make artificial LRI and with how many interactions (\code{N})
+#'
+#' @return data frame with the same columns as \code{mtx.sparse}
+#'
+#' @seealso \code{\link{move_contacts}} on how single artificial LRI (\code{i},\code{j}) is created
+#'
+#' @examples
+#' npz <- read_npz("/home/rafal/data/hic-normalization-40kb/raw/IMR90-MboI-1_40kb-raw.npz", mtx.names = c("18"))
+#' mtx <- npz[["18"]]
+#' # create artificial LRI data frame:
+#' interactions <- data.frame(i = c(4, 150, 386, 370, 463, 472), j = c(8, 180, 500, 390, 481, 485), N = c(30, 40, 100, 75, 40, 88))
+#' # produce contact map with artificial LRI
+#' mtx.r <- artificial_lri(mtx, interactions)
+#' m1 <- sparse2dense(mtx, N = 1952)
+#' m2 <- sparse2dense(mtx.r, N = 1952)
+#' md <- m1 - m2
+#' # see artificial LRI
+#' plot_diff_map(md, na.color = "white", breaks = 100)
+#'
+#' @export
+artificial_lri <- function(mtx.sparse, interactions){
+  bins <- unique(c(mtx.sparse$i, mtx.sparse$j))
+  sapply(seq(1, nrow(interactions)), function(x){
+    if(length(intersect(bins, interactions[x, c("i","j")])) < 2){
+      warning(paste0("No interactions for bins ", paste(interactions[x,], collapse = ","), " found in given matrix (probably unmappable region), skipping..."))
+      return(-1)
+    }
+    return(x)
+  }) -> v
+  interactions <- interactions[v[v > 0],]
+  mtx.random.lri <- mtx.sparse
+  for(x in seq(1, nrow(interactions))){
+    mtx.random.lri <- move_contacts(mtx.random.lri, interactions[x, "i"], interactions[x, "j"], interactions[x, "N"])
+  }
+  return(mtx.random.lri)
+}
+
 #' Hi-C interactions bootstrapping.
 #'
 #' Randomly samples interactions from data frame with atomic interactions into \code{length(ratio)} data frames with interactions in such a way that i-th dataframe have \code{ratio[i]} fraction of interactions of initial atomic interactions data frame.
@@ -587,19 +707,27 @@ sparse2interactions <- function(sparse.mtx){
 #' print(ratios.sampled)
 #'
 #' @export
-bootstrap_interactions <- function(interactions, ratio = c(0.5, 0.5)){
-  stopifnot(sum(ratio) == 1)
-  stopifnot(all(ratio > 0))
-  n <- nrow(interactions)
-  floor(ratio[seq(1,length(ratio)-1)] * n) %>%
-    c(magrittr::subtract(n,sum(.))) -> groups.sizes
-  seq(1,length(groups.sizes)) %>%
-    sapply(function(x){
-      rep(x, groups.sizes[x])
-    }, simplify = FALSE) %>%
-    unlist() %>%
-    sample() %>%
-    split(interactions,.) -> interactions.ratios
+bootstrap_interactions <- function(interactions, ratio = c(0.5, 0.5), with.replacement = FALSE){
+  if(with.replacement){
+    # for sampling with replacement ratio should be a vector containing number of interactions to draw
+    stopifnot(all(ratio %% 1 == 0))
+    lapply(ratio, function(int.number){
+      interactions[sample(nrow(interactions), int.number, replace = TRUE),]
+    }) %>% magrittr::set_names(seq(1,length(ratio))) -> interactions.ratios
+  } else {
+    stopifnot(sum(ratio) == 1)
+    stopifnot(all(ratio > 0))
+    n <- nrow(interactions)
+    floor(ratio[seq(1,length(ratio)-1)] * n) %>%
+      c(magrittr::subtract(n,sum(.))) -> groups.sizes
+    seq(1,length(groups.sizes)) %>%
+      sapply(function(x){
+        rep(x, groups.sizes[x])
+      }, simplify = FALSE) %>%
+      unlist() %>%
+      sample() %>%
+      split(interactions,.) -> interactions.ratios
+  }
   names(interactions.ratios) %>%
     lapply(function(x){
       # convert atomic interactions to sparse matrix
@@ -617,7 +745,8 @@ bootstrap_interactions <- function(interactions, ratio = c(0.5, 0.5)){
 #' For details of bootstrapping procedure see \code{\link{bootstrap_interactions}}.
 #'
 #' @param sparse.mtx data.frame Hi-C contact map in sparse format with mandatory columns i, j, val
-#' @param ratio numeric vector indicating on how many atomic interaction sets should initial atomic interaction set be divided; each entry of ratio vector contains fraction of interaction to be put in corresponding atomic interactions set; ratio vector must sum to 1 and all its entries must be larger than one
+#' @param ratio numeric vector indicating on how many atomic interaction sets should initial atomic interaction set be divided; the values inside this vector depend on which sampling is used (with or without replacement); each entry of ratio vector contains fraction of interaction to be put in corresponding atomic interactions set; ratio vector must sum to 1 and all its entries must be larger than one
+#' @param with.replacement logical indicating whether to perform sampling with or without (default) replacement
 #'
 #' @return list with data frames (Hi-C maps in sparse format) containing sampled interactions (according to specified ratio vector)
 #'
@@ -629,21 +758,84 @@ bootstrap_interactions <- function(interactions, ratio = c(0.5, 0.5)){
 #' print(bootstrapped)
 #'
 #' @export
-bootstrap_sparse <- function(sparse.mtx, ratio = c(0.5, 0.5)){
+bootstrap_sparse <- function(sparse.mtx, ratio = c(0.5, 0.5), with.replacement = FALSE){
   # divides Hi-C contact map on length(ration) maps according to specified ratios,
   # where each map contains fraction of contacts from original contact map
   # initial contact map is given in sparse data.frame format:
   # i j val chromosome
-  stopifnot(sum(ratio) == 1)
+  if(with.replacement){
+    stopifnot(all(ratio %% 1 == 0))
+  } else {
+    stopifnot(sum(ratio) == 1)
+  }
   stopifnot(all(ratio > 0))
-  mtx.by.name <- split(sparse.mtx, sparse.mtx$name)
-  names(mtx.by.name) %>%
-    lapply(function(name){
-      sparse2interactions(mtx.by.name[[name]]) %>%
-        bootstrap_interactions(ratio = ratio)
-    }) %>%
-    do.call("rbind",.) %>%
+  sparse2interactions(sparse.mtx) %>%
+    bootstrap_interactions(ratio = ratio, with.replacement = with.replacement) %>%
     split(magrittr::use_series(.,"ratio.number"))
+}
+
+#' Bootstraps interactions from given Hi-C dataset.
+#'
+#' Dataset containing number of Hi-C contact maps is used to sample interactions with or without replacement.
+#'
+#' @param path character path to Hi-C dataset in npz format
+#' @param ratio list with vectors - ratios for \code{\link{bootstrap_sparse}}; if contains only one element (one ratio vector) then the same ratio vector is used for all contact maps in given Hi-C dataset; otherwise names of elements (ratio vectors) in list must match those in given Hi-C dataset
+#' @param with.replacement logical which type of sampling
+#' @param N numeric number of repetitions, i.e. number of bootstraps; each bootstrap will have number of maps equal to length of corresponding entry in ratio list
+#' @param mtx.names character vector with subset of Hi-C maps names to be selected for analysis, by default all matrices are used
+#' @param n.cores numeric number of cores to be used for parallel processing
+#'
+#' @return list containing bootstraps of corresponding matrices of Hi-C dataset
+#'
+#' @examples
+#' # say we have 2 Hi-C datasets: IMR90-MboI-1 and MSC-HindIII-1 in 40kb
+#' npz1 <- read_npz("IMR90-MboI-1_40kb-raw.npz")
+#' npz2 <- read_npz("MSC-HindIII-1_40kb-raw.npz")
+#' # we want to produce 2*4 bootstraps of IMR90:
+#' # 4 with the same number of interactions as in IMR90-MboI-1 and
+#' # 4 with the same number of interactions as in MSC-HindIII-1
+#' # first calculate number of interactions in both datasets on all chromosomes
+#' nm <- intersect(names(npz1), names(npz2))
+#' ratio <- lapply(nm, function(x) c(sum(npz1[[x]]$val), sum(npz2[[x]]$val)))
+#' names(ratio) <- nm
+#' # now produce bootstraps - pairs of bootstrap maps such that the number of interactions corresponds to first and second datasets can be used to asses technical variability including different sequencing depth
+#' bts <- bootstrap_dataset("IMR90-MboI-1_40kb-raw.npz", N = 4, with.replacement = TRUE, ratio = ratio, save.path = "~/bootstrapped")
+#'
+#' @export
+bootstrap_dataset <- function(path, ratio = list(c(0.5, 0.5)), with.replacement = FALSE, N = 3, mtx.names = "all", n.cores = 1, save.path = NULL){
+  stopifnot(typeof(ratio) == "list")
+  sizes <- read_size(path, mtx.names = mtx.names)
+  maps.sparse <- read_npz(path, mtx.names = mtx.names)
+  maps.names <- names(maps.sparse)
+  if(is.null(names(ratio))){
+    ratio <- rep(ratio, length(maps.names))
+    names(ratio) <- maps.names
+  }
+  all.names <- intersect(maps.names, names(ratio))
+  lapply(all.names, function(x){
+    parallel::mclapply(1:N, function(x, m, r, wr){
+      bootstrap_sparse(m, ratio = r, with.replacement = wr) %>%
+        lapply(function(df) df[c("i","j","val","diagonal","name")])
+    }, maps.sparse[[x]], ratio[[x]], with.replacement, mc.cores = n.cores) %>%
+      magrittr::set_names(1:N) %>%
+      unlist(recursive = FALSE) %>%
+      magrittr::set_names(names(.) %>% gsub("\\.","-",.))
+  }) %>% magrittr::set_names(all.names) -> bootstrapped
+  # if save path is given then save to file
+  if(!is.null(save.path)){
+    dir.create(save.path, showWarnings = FALSE)
+    name.prefix <- sub('\\..*$','', basename(path))
+    bootstrapped.swap <- datasets <- do.call(function(...) Map(list, ...), bootstrapped)
+    for(dataset.name in names(bootstrapped.swap)){
+      fname <- paste0(name.prefix,"_bootstrap_",dataset.name,".npz")
+      dataset <- bootstrapped.swap[[dataset.name]]
+      save_npz(lapply(names(dataset), function(x){
+        sparse2dense(dataset[[x]], N = sizes[x,"n.rows"])
+      }) %>% magrittr::set_names(names(dataset)), paste0(save.path,"/",fname))
+    }
+    return(NULL)
+  }
+  return(bootstrapped)
 }
 
 #' Maps interactions to TADs.
@@ -741,8 +933,13 @@ interactions2tads <- function(mtx.sparse, tads, cols = c("val")){
 best_fit_bilinear <- function(x.vec, y.vec, truncate.left = 0, truncate.right = 0){
   stopifnot(length(x.vec) == length(y.vec))
   idx.inf <- which(y.vec == -Inf | y.vec == Inf)
-  x <- x.vec[-idx.inf][(1 + truncate.left):(length(x.vec) - length(idx.inf) - truncate.right)]
-  y <- y.vec[-idx.inf][(1 + truncate.left):(length(y.vec) - length(idx.inf) - truncate.right)]
+  if(length(idx.inf) > 0){
+    x <- x.vec[-idx.inf][(1 + truncate.left):(length(x.vec) - length(idx.inf) - truncate.right)]
+    y <- y.vec[-idx.inf][(1 + truncate.left):(length(y.vec) - length(idx.inf) - truncate.right)]
+  } else {
+    x <- x.vec[(1 + truncate.left):(length(x.vec) - length(idx.inf) - truncate.right)]
+    y <- y.vec[(1 + truncate.left):(length(y.vec) - length(idx.inf) - truncate.right)]
+  }
   fit.bilinear <- function(Cx){
     lhs <- function(x) ifelse(x < Cx,Cx-x,0)
     rhs <- function(x) ifelse(x < Cx,0,x-Cx)
@@ -817,7 +1014,7 @@ local.min <- function(v) which(diff(sign(diff(v))) == 2) + 1
 #'
 #' @return numeric value of first local maximum in \code{v} starting from the end of v and going left; NA if v is nonincresing starting at last element of v and going left (i.e. v is either constant or there is minmum first)
 #'
-#' @seealso \code{\link{CopulaHiC::local.min}}, \code{\link{CopulaHiC::local.max}} for finding local minma and maxima in vector v
+#' @seealso \code{\link{DIADEM::local.min}}, \code{\link{DIADEM::local.max}} for finding local minma and maxima in vector v
 #'
 #' @examples
 #' # maximum in 7 (index 2) starting from 1 (index 8) and moving with decreasing indices
@@ -852,7 +1049,7 @@ left.max <- function(v){
 #'
 #' @return numeric value of first local minimum in \code{v} starting from the begining of v and going right; NA if v is nondecreasing starting at first element of v and going right (i.e. v is either constant or there is maximum first)
 #'
-#' @seealso \code{\link{CopulaHiC::local.min}}, \code{\link{CopulaHiC::local.max}} for finding local minma and maxima in vector v
+#' @seealso \code{\link{DIADEM::local.min}}, \code{\link{DIADEM::local.max}} for finding local minma and maxima in vector v
 #'
 #' @examples
 #' # maximum first (in 7, index 3)
@@ -889,7 +1086,7 @@ right.min <- function(v){
 #'
 #' @examples
 #' # get Hi-C contact map
-#' sparse.mtx <- CopulaHiC::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
+#' sparse.mtx <- DIADEM::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
 #' dense.mtx <- sparse2dense(sparse.mtx[c("i","j","val")], N = 1952)
 #' # get tads
 #' tads <- map2tads(dense.mtx)
@@ -979,4 +1176,77 @@ intersect_tads <- function(tads1, tads2){
   itads2 <- intervals::Intervals(tads2[c("start","end")])
   intervals::interval_intersection(itads1, itads2) %>%
     as.data.frame() %>% magrittr::set_colnames(c("start","end"))
+}
+
+#' Extracts crosses around i,j cells of given matrix.
+#'
+#' Given matrix \code{mtx.dense} and positive integer \code{k} it extracts cells:
+#' \itemize{
+#'  \item{}{i - k, j}
+#'  \item{}{i, j - k}
+#'  \item{}{i - (k-1), j}
+#'  \item{}{i, j - (k-1)}
+#'  \item{}{.}
+#'  \item{}{.}
+#'  \item{}{.}
+#'  \item{}{i - 1, j}
+#'  \item{}{i, j - 1}
+#'  \item{}{i + 1, j}
+#'  \item{}{i, j + 1}
+#'  \item{}{.}
+#'  \item{}{.}
+#'  \item{}{.}
+#'  \item{}{i + (k - 1), j}
+#'  \item{}{i, j + (k - 1)}
+#'  \item{}{i + k, j}
+#'  \item{}{i, j + k}
+#'  \item{}{i, j}
+#' }
+#' The above cells are columns in resulting data frame, so it has in total 2 + 4 * k + 1 columns: first two are cell coordinates in initial matrix, i.e.: i and j, remaining columns are the above values (in the order specified above). Selection of cross size \code{k} enforces that cells belonging to rows, columns or diagonals (starting at main diagonal) with indices 1 to \code{k} or \code{n-k+1} to \code{n} can't be assigned any value.
+#'
+#' @param mtx.dense numeric symmetric matrix
+#' @param k numeric cross size
+#' @param max.d numeric fraction of domains to be taken, i.e.: if \code{mtx.dense} is of size \code{n} (i.e. it have \code{n} diagonals) then \code{floor(max.d * n)} diagonals, starting at main diagonal will be taken and remaining will be discarded.
+#' @param m numeric how many diagonals (starting at main diagonal) to discard, by definition of cross this must be fixed to m > k to have effect as m will be finally be selected as: \code{max(k,m)}
+#'
+#' @examples
+#'
+#' @export
+crosses <- function(mtx.dense, k = 1, max.d = 0.15, m = 1){
+  n <- nrow(mtx.dense)
+  N <- floor(n * max.d)
+  # copy matrix and zero m diagonals, k left/right and top/bottom columns and rows respectively
+  mtx <- mtx.dense
+  i <- row(mtx)
+  j <- col(mtx)
+  mtx[i < j] <- 0
+  idx.diags <- c(seq(1,max(m,k)), seq(N+1,n))
+  idx.diags.mtx <- unlist(sapply(seq(1,n), function(x){
+    unlist(sapply(idx.diags[idx.diags + x - 1 <= n], function(y){
+      n * (x - 1) + (x - 1) + y
+    }))
+  }))
+  mtx[idx.diags.mtx] <- 0
+  if(k > 0){
+    mtx[seq(1,k),] <- 0
+    mtx[,seq(1,k)] <- 0
+    mtx[seq(n-k+1,n),] <- 0
+    mtx[,seq(n-k+1,n)] <- 0
+  }
+  # get indices of non zero cells
+  idx <- which(mtx != 0, arr.ind = TRUE)
+  # for each non zero cell get k cells to the left/right and k cells above/below
+  if(k > 0){
+    apply(idx, 1, function(x){
+      sapply(c(seq(-k,-1), seq(1,k)), function(y){
+        c(mtx.dense[x["row"]+y,x["col"]], mtx.dense[x["row"],x["col"]+y])
+      }) %>% unlist()
+    }) %>% t() %>% cbind(mtx.dense[idx]) -> ij.crosses
+  } else {
+    mtx.dense[idx] -> ij.crosses
+  }
+  df <- as.data.frame(cbind(idx, ij.crosses))
+  df <- df[c("col","row", colnames(df)[3:ncol(df)])]
+  colnames(df)[1:2] <- c("i","j")
+  return(df)
 }

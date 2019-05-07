@@ -16,7 +16,7 @@ This function requires python and numpy.
 }
 \examples{
 # get sample npz file name
-mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 mtx.dense.list <- read_dense(mtx.fname) # reads all chromosomes
 # limiting number of chromosomes
 mtx.dense.sublist <- read_dense(mtx.fname, mtx.names = c("18","19")) # only read chromosome 18 and 19

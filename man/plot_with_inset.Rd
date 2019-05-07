@@ -23,7 +23,7 @@ Additionally it can plot regions on both orignal image and inset.
 }
 \examples{
 # get Hi-C map file
-mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 # read it and take chromosome 18
 m.sparse18 <- read_npz(mtx.fname, mtx.names = c("18"))[["18"]]
 dense <- sparse2dense(m.sparse18[c("i","j","val")], N = 1952)

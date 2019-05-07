@@ -11,7 +11,7 @@ Npz file containing Hi-C contact maps of human MSC in 40kb resolution. The data 
 }
 \examples{
 # get file name
-mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 }
 \seealso{
 \url{https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.savez_compressed.html} for npz format description, Dixon et al., 2015 "Chromatin architecture reorganization during stem cell differentiation" for study where this dataset comes from, Imakaev et al., 2012 "Iterative correction of Hi-C data reveals hallmarks of chromosome organization." for Iterative Correction of Hi-C contact maps and \url{https://mirnylab.bitbucket.io/hiclib/index.html} for its python implementation

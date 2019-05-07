@@ -5,7 +5,8 @@
 \title{Plots simple contact map or fold-change contact map with log2 scale.}
 \usage{
 plot_contact_map(contact.map, fc = FALSE, breaks = 100,
-  zeros.na = TRUE, colors.pal = c("white", "red"), ...)
+  zeros.na = TRUE, colors.pal = c("white", "red"), useRaster = TRUE,
+  ...)
 }
 \arguments{
 \item{contact.map}{numeric matrix (with non-negative entries) to be plotted}
@@ -16,6 +17,8 @@ plot_contact_map(contact.map, fc = FALSE, breaks = 100,
 
 \item{colors.pal}{colors for pallette}
 
+\item{useRaster}{logical if TRUE (default) lower quality image is produced, but the process is much faster and resulting file uses little space}
+
 \item{title}{character plot title}
 }
 \description{
@@ -23,13 +26,13 @@ Plots simple contact map or fold-change contact map with log2 scale.
 }
 \examples{
 # get sample contact map (MSC replicate 1) for chromosome 18
-mtx1.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
+mtx1.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
 # convert to dense
 mtx1 <- sparse2dense(mtx1.sparse[c("i","j","val")], N = 1952)
 plot_contact_map(mtx1)
 # now make fold-change matrix
 # get another sample contact map (MSC replicate 2) for chromosome 18
-mtx2.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
+mtx2.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
 merged <- base::merge(mtx1.sparse, mtx2.sparse, by = c("i", "j"))
 merged$fc <- merged$val.x / merged$val.y
 fc.mtx <- sparse2dense(merged[c("i","j","fc")], N = 1952)
@@ -37,5 +40,5 @@ plot_contact_map(fc.mtx, fc = TRUE, colors.pal = c("blue","white","red"))
 
 }
 \seealso{
-\code{\link{CopulaHiC::iamge_plot_na}} for function handling heatmap plotting
+\code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
 }

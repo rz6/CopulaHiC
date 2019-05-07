@@ -27,7 +27,7 @@ Performs PCA on Hi-C contact map as described in Liebermann-Aiden et al 2009. Mo
 \examples{
 # load Hi-C contact maps from npz file
 # get sample npz file name
-mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 mtx.sparse.list <- read_npz(mtx.fname, sparse.format = TRUE)
 # get matrix for selected chromosome
 mtx <- mtx.sparse.list[["18"]]

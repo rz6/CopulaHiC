@@ -19,7 +19,7 @@ Reads dimension of every matrix in npz file.
 }
 \examples{
 # get sample npz file name
-mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 sizes <- read_size(mtx.fname)
 print(sizes)
 
