@@ -10,7 +10,7 @@
 #'
 #' @examples
 #' # get file name
-#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 NULL
 
 #' Npz file with sample Hi-C contact maps dataset.
@@ -25,7 +25,7 @@ NULL
 #'
 #' @examples
 #' # get file name
-#' mtx.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 NULL
 
 #' Csv file with sample TADs dataset.
@@ -36,7 +36,7 @@ NULL
 #'
 #' @examples
 #' # get file name
-#' tads.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "CopulaHiC", mustWork = TRUE)
+#' tads.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "DIADEM", mustWork = TRUE)
 NULL
 
 #' Sample Hi-C contact maps dataset.

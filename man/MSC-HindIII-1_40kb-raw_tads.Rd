@@ -8,5 +8,5 @@ Contains TAD boundaries of \link{MSC-HindIII-1_40kb-raw_maps} determined using I
 }
 \examples{
 # get file name
-tads.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "CopulaHiC", mustWork = TRUE)
+tads.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "DIADEM", mustWork = TRUE)
 }

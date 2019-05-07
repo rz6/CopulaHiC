@@ -4,33 +4,28 @@
 \alias{hicdiff2mtx}
 \title{Converts significance maps to dense matrices.}
 \usage{
-hicdiff2mtx(hicdiff.list, maps.dims, val.column = c("p.value.corrected",
-  "p.value")[1], neg.log = TRUE, mark.depleted = TRUE)
+hicdiff2mtx(hicdiff.list, maps.dims, val.column = c("qvalue",
+  "pvalue")[1], neg.log = TRUE, which.enrichment = c("both", "x",
+  "y")[1])
 }
 \arguments{
 \item{hicdiff.list}{list of data frames, output from \code{\link{hicdiff}} function}
 
-\item{maps.dims}{list of data frames, usually an attribute of HiCcopula object that was used to produce hicdiff.list}
+\item{maps.dims}{list of data frames, usually an attribute of HiCglm object that was used to produce hicdiff.list}
 
-\item{val.column}{character indicating which column of sparse significance map to use as cell value for dense matrix (one of p.value or p.value.corrected)}
+\item{val.column}{character indicating which column of sparse significance map to use as cell value for dense matrix (either pvalue or qvalue)}
 
-\item{neg.log}{logical wheter to apply -log10(.) to val.column}
+\item{neg.log}{logical wheter to apply -log transformation to val.column}
 
-\item{mark.depleted}{logical whether to mark depleted cells as negative}
+\item{which.enrichment}{character indicating whether to calculate Y enrichment (i.e. E[Y | X] model) - choose y, X enrichment (i.e. E[X | Y] model) - choose x or both}
 }
 \value{
-list with dense matrices
+list with dense matrices containing significance in each cell; when which.enrichment is fixed to both upper triangular map will contain significances of E[Y | X] model and lower triangular will contain significances of E[X | Y]
 }
 \description{
 Given list of significance maps in sparse format produced by \code{\link{hicdiff}} function converts them to dense matrix format.
 }
 \examples{
-# first create HiCcopula object - see ?HiCcopula for examples
-# then produce hicdiff.list
-hicdiff.list <- hicdiff(hic.copula)
-dense.hicdiff.list <- hicdiff2mtx(hicdiff.list)
-# elements of dense.list can be visualized
-plot_diff_map(dense.hicdiff.list[["18"]], breaks = 100)
 
 }
 \seealso{

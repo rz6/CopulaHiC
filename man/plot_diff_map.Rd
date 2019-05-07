@@ -7,7 +7,7 @@
 plot_diff_map(mtx.dense, zeros.na = TRUE, breaks = 10,
   colors.pal = c("blue", "white", "red"), color.range = NULL,
   sqrt.transform = FALSE, na.color = "black", neg.inf.color = "gold",
-  pos.inf.color = "darkgreen", ...)
+  pos.inf.color = "darkgreen", useRaster = TRUE, ...)
 }
 \arguments{
 \item{mtx.dense}{numeric matrix with positive and negative entries; if matrix does not contain any negative values use \code{\link{plot_contact_map}} function}
@@ -21,15 +21,17 @@ plot_diff_map(mtx.dense, zeros.na = TRUE, breaks = 10,
 \item{color.range}{numeric vector of length 2 or NULL; if specified gives minimum and maximum values for color scale; this is manual adjustment of scale}
 
 \item{sqrt.transform}{logical if TRUE apply sqrt transformation: sqrt(pos) to positive elements of matrix and -sqrt(abs(neg)) to negative elements of matrix}
+
+\item{useRaster}{logical if TRUE (default) lower quality image is produced, but the process is much faster and resulting file uses little space}
 }
 \description{
 Draws differential map (i.e. one with positive and negative entries).
 }
 \examples{
 # get sample contact map (MSC replicate 1) for chromosome 18
-mtx1.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
+mtx1.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
 # get another sample contact map (MSC replicate 2) for chromosome 18
-mtx2.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
+mtx2.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
 # make differential map
 merged <- base::merge(mtx1.sparse, mtx2.sparse, by = c("i", "j"))
 merged$difference <- merged$val.x - merged$val.y
@@ -41,5 +43,5 @@ plot_diff_map(dense, sqrt.transform = TRUE)
 
 }
 \seealso{
-\code{\link{CopulaHiC::iamge_plot_na}} for function handling heatmap plotting
+\code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
 }

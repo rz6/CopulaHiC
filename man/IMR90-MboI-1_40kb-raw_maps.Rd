@@ -11,7 +11,7 @@ Npz file containing Hi-C contact maps of human IMR90 in 40kb resolution. The dat
 }
 \examples{
 # get file name
-mtx.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 }
 \seealso{
 \url{https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.savez_compressed.html} for npz format description, Rao et al., 2014 "A three-dimensional map of the human genome at kilobase resolution reveals prinicples of chromatin looping" for study where this dataset comes from, Imakaev et al., 2012 "Iterative correction of Hi-C data reveals hallmarks of chromosome organization." for Iterative Correction of Hi-C contact maps and \url{https://mirnylab.bitbucket.io/hiclib/index.html} for its python implementation

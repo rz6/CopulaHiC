@@ -4,12 +4,15 @@
 \alias{bootstrap_sparse}
 \title{Bootstraps interactions from contact map given in sparse format.}
 \usage{
-bootstrap_sparse(sparse.mtx, ratio = c(0.5, 0.5))
+bootstrap_sparse(sparse.mtx, ratio = c(0.5, 0.5),
+  with.replacement = FALSE)
 }
 \arguments{
 \item{sparse.mtx}{data.frame Hi-C contact map in sparse format with mandatory columns i, j, val}
 
-\item{ratio}{numeric vector indicating on how many atomic interaction sets should initial atomic interaction set be divided; each entry of ratio vector contains fraction of interaction to be put in corresponding atomic interactions set; ratio vector must sum to 1 and all its entries must be larger than one}
+\item{ratio}{numeric vector indicating on how many atomic interaction sets should initial atomic interaction set be divided; the values inside this vector depend on which sampling is used (with or without replacement); each entry of ratio vector contains fraction of interaction to be put in corresponding atomic interactions set; ratio vector must sum to 1 and all its entries must be larger than one}
+
+\item{with.replacement}{logical indicating whether to perform sampling with or without (default) replacement}
 }
 \value{
 list with data frames (Hi-C maps in sparse format) containing sampled interactions (according to specified ratio vector)

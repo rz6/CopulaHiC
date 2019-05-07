@@ -1,4 +1,4 @@
-# CopulaHiC #
+# DIADEM #
 ------------------------------
 
 Authors: Rafal Zaborowski, Bartek Wilczynski
@@ -12,13 +12,13 @@ For more information please contact r.zaborowski@mimuw.edu.pl or bartek@mimuw.ed
 ## Quick summary ##
 -------------------
 
-CopulaHiC is R package for differential analysis of Hi-C data. It takes advantage of significant correlations of main diagonals between different Hi-C data sets (cell lines, experiments, etc.) - usually first 200 to 300 diagonals from main diagonal are considered. CopulaHiC uses copulas to model these dependancies and then quantifies deviatons from the model in a probabilistic way. The only required input are raw Hi-C contact maps files in numpy [npz](https://kite.com/python/docs/numpy.lib.npyio.NpzFile) format.
+DIADEM is R package for differential analysis of Hi-C data. It takes advantage of significant correlations of main diagonals between different Hi-C data sets (cell lines, experiments, etc.). The number of diagonals (maximum genomic distance between interacting regions) depends on chromosome and data quality but usually will equal to about 5% of total number of bins in given chromosome contact map. DIADEM uses GLM to model relationship between corresponding cells of a pair of Hi-C datasets at given genomic distance and then quantifies deviatons from the model in probabilistic way. The only required input are raw Hi-C contact map files in numpy [npz](https://kite.com/python/docs/numpy.lib.npyio.NpzFile) format.
 
-For more details, examples and quick start refer to vignette (CopulaHiC_vignette.html file). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual (CopulaHiC.pdf file).
+For more details, examples and quick start refer to vignette (DIADEM_vignette.html file). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual (DIADEM.pdf file).
 
 The indepth description of our model together with detailed analysis and motivation will be described in manuscript (in preparation - available soon).
 
-NOTE: CopulaHiC_vignette.html file can't be properly rendered from within github. Therefore it is recommended to download the file (or just clone the repo) and then open it.
+NOTE: DIADEM_vignette.html file can't be properly rendered from within github. Therefore it is recommended to download the file (or just clone the repo) and then open it.
 
 ## Prerequisites ##
 -------------------
@@ -35,13 +35,13 @@ Additionally following R packages are required:
 *  reticulate
 *  Matrix
 *  fields
-*  fitdistrplus
-*  VineCopula
 *  parallel
 *  igraph
 *  raster
 *  latex2exp
 *  intervals
+*  robustreg
+*  MASS
 
 Following additional packages are required for examples and plotting:
 
@@ -59,28 +59,28 @@ Two ways of installation are possible (both require R package [devtools](https:/
 1. from github repository:
 
     ```r
-    devtools::install_github("rz6/CopulaHiC")
+    devtools::install_github("rz6/DIADEM")
     ```
 
-2. from source: clone repository - by default to directory: copulahic, cd to directory containing cloned repo, open R and run:
+2. from source: clone repository - by default to directory: diadem, cd to directory containing cloned repo, open R and run:
  
     ```r
-    devtools::install("copulahic")
+    devtools::install("diadem")
     ```
     
 ## Usage ##
 -----------
 
-Import CopulaHiC package and list functions inside it:
+Import DIADEM package and list functions inside it:
 
 ```r
-library("CopulaHiC")
-getNamespaceExports("CopulaHiC")
+library("DIADEM")
+getNamespaceExports("DIADEM")
 ```
 
 #### Sample data ####
 
-CopulaHiC package contains sample data of Hi-C contact maps and TADs. Both of them are in 2 formats:  
+DIADEM package contains sample data of Hi-C contact maps and TADs. Both of them are in 2 formats:  
 
 1. Numpy npz file (Hi-C maps) and csv file (TADs) - to access it run:
 
@@ -88,9 +88,9 @@ CopulaHiC package contains sample data of Hi-C contact maps and TADs. Both of th
 
         ```r
         # file name of MSC-HindIII-1_40kb-raw_maps
-        mtx.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+        mtx.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
         # file name of IMR90-MboI-1_40kb-raw_maps
-        mtx.fname.imr90 <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+        mtx.fname.imr90 <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
         # load data
         maps.msc <- read_npz(mtx.fname.msc)
         maps.imr90 <- read_npz(mtx.fname.msc)
@@ -100,7 +100,7 @@ CopulaHiC package contains sample data of Hi-C contact maps and TADs. Both of th
 
         ```r
         # file name of MSC-HindIII-1_40kb-raw_tads
-        tads.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "CopulaHiC", mustWork = TRUE)
+        tads.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "DIADEM", mustWork = TRUE)
         # load data
         tads.msc <- read.csv(tads.fname.msc)
         ```
@@ -111,9 +111,9 @@ CopulaHiC package contains sample data of Hi-C contact maps and TADs. Both of th
 
         ```r
         # list available Hi-C maps
-        print(names(CopulaHiC::sample_hic_maps))
+        print(names(DIADEM::sample_hic_maps))
         # get one
-        map.imr90 <- CopulaHiC::sample_hic_maps[["IMR90-MboI-1_40kb-raw"]]
+        map.imr90 <- DIADEM::sample_hic_maps[["IMR90-MboI-1_40kb-raw"]]
         print(names(map.imr90))
         print(head(map.imr90[["18"]]))
         ```
@@ -122,9 +122,9 @@ CopulaHiC package contains sample data of Hi-C contact maps and TADs. Both of th
 
         ```r
         # list available TADs
-        print(names(CopulaHiC::sample_tads))
+        print(names(DIADEM::sample_tads))
         # get one
-        tads.imr90 <- CopulaHiC::sample_tads[["IMR90-MboI-1_40kb-raw"]]
+        tads.imr90 <- DIADEM::sample_tads[["IMR90-MboI-1_40kb-raw"]]
         print(head(tads.imr90))
         ```
 

@@ -24,7 +24,7 @@ For details on Insulation Score approach of TAD boundaries detection see Crane e
 }
 \examples{
 # get Hi-C contact map
-sparse.mtx <- CopulaHiC::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
+sparse.mtx <- DIADEM::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
 dense.mtx <- sparse2dense(sparse.mtx[c("i","j","val")], N = 1952)
 # get tads
 tads <- map2tads(dense.mtx)

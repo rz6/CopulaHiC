@@ -4,7 +4,7 @@
 \alias{plot_regions}
 \title{Plots regions (TADs or Long Range interactions) on contact map.}
 \usage{
-plot_regions(regions, pal.colors = NULL)
+plot_regions(regions, pal.colors = NULL, lty = 1, lwd = 0.5)
 }
 \arguments{
 \item{regions}{data frame or matrix with 2 (+1) or 4 (+1) columns; 2 columns format is for tads - first column is start bin, second column is end bin; 4 columns format is for LR interactions (rectangle like regions) - columns 1,2 are start and end bin of first interacting region, columns 3,4 are start and end bin of second interacting region; Last column (optional) is category column - like effect column with depletion, no.change, enrichment values to color TADs or LR interactions accordingly}
@@ -18,7 +18,7 @@ Plots regions (TADs or Long Range interactions) on contact map.
 # plot contact map or differential map - see ?plot_diff_map
 plot_diff_map(dense, sqrt.transform = TRUE)
 # then get tads and plot them
-tads <- CopulaHiC::sample_tads[["MSC-HindIII-1_40kb-raw"]]
+tads <- DIADEM::sample_tads[["MSC-HindIII-1_40kb-raw"]]
 tads18 <- tads[tads$name == "18",]
 plot_regions(tads18[c("start","end")])
 # for plotting differential interactions see ?differential_interactions

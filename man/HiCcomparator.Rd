@@ -5,7 +5,7 @@
 \title{An S3 class to represent object for Hi-C maps comparisons.}
 \usage{
 HiCcomparator(path1, path2, tads = NULL, mtx.names = "all",
-  which.tads = 4, do.pca = FALSE)
+  which.tads = 4, do.pca = FALSE, zscore = FALSE, props = FALSE)
 }
 \arguments{
 \item{path1}{character - path to npz file containing first set of Hi-C maps}
@@ -34,11 +34,11 @@ intervals between them.
 }
 \examples{
 # get path of first sample maps
-mtx1.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx1.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 # get path of second sample maps
-mtx2.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx2.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 # get sample TADs
-tads <- CopulaHiC::sample_tads[c("IMR90-MboI-1_40kb-raw", "MSC-HindIII-1_40kb-raw")]
+tads <- DIADEM::sample_tads[c("IMR90-MboI-1_40kb-raw", "MSC-HindIII-1_40kb-raw")]
 # construct HiCcomparator object for chromosomes 18 and 19
 hic.comparator <- HiCcomparator(mtx1.fname, mtx2.fname, tads, mtx.names = c("18","19"))
 # plot A/B compartments for first and second map in chromosome 19

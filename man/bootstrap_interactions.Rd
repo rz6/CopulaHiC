@@ -4,7 +4,8 @@
 \alias{bootstrap_interactions}
 \title{Hi-C interactions bootstrapping.}
 \usage{
-bootstrap_interactions(interactions, ratio = c(0.5, 0.5))
+bootstrap_interactions(interactions, ratio = c(0.5, 0.5),
+  with.replacement = FALSE)
 }
 \arguments{
 \item{interactions}{data frame containing row with i and j coordinate for every single interaction}

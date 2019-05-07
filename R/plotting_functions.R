@@ -91,20 +91,21 @@ image_plot_na <- function(z,  breaks, col, na.color = 'black',
 #' @param breaks numeric number of breaks on color scale
 #' @param colors.pal colors for pallette
 #' @param title character plot title
+#' @param useRaster logical if TRUE (default) lower quality image is produced, but the process is much faster and resulting file uses little space
 #'
 #' @return NULL
 #'
-#' @seealso \code{\link{CopulaHiC::iamge_plot_na}} for function handling heatmap plotting
+#' @seealso \code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
 #'
 #' @examples
 #' # get sample contact map (MSC replicate 1) for chromosome 18
-#' mtx1.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
+#' mtx1.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
 #' # convert to dense
 #' mtx1 <- sparse2dense(mtx1.sparse[c("i","j","val")], N = 1952)
 #' plot_contact_map(mtx1)
 #' # now make fold-change matrix
 #' # get another sample contact map (MSC replicate 2) for chromosome 18
-#' mtx2.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
+#' mtx2.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
 #' merged <- base::merge(mtx1.sparse, mtx2.sparse, by = c("i", "j"))
 #' merged$fc <- merged$val.x / merged$val.y
 #' fc.mtx <- sparse2dense(merged[c("i","j","fc")], N = 1952)
@@ -112,7 +113,7 @@ image_plot_na <- function(z,  breaks, col, na.color = 'black',
 #'
 #' @export
 plot_contact_map <- function(contact.map, fc = FALSE, breaks = 100, zeros.na = TRUE,
-                             colors.pal = c("white","red"), ...){
+                             colors.pal = c("white","red"), useRaster = TRUE, ...){
   pal = colorRampPalette(colors.pal)
   if(zeros.na){
     contact.map[contact.map == 0] <- NA
@@ -124,7 +125,7 @@ plot_contact_map <- function(contact.map, fc = FALSE, breaks = 100, zeros.na = T
   }
   mtx.dim <- dim(cm)
   # log transformation of color range
-  mtx.color.range <- log2(cm[(!is.na(cm)) & (cm > 0)])
+  mtx.color.range <- log2(cm[(!is.na(cm)) & (cm > 0) & (abs(cm) != Inf)])
   color.range.min <- min(mtx.color.range)
   color.range.max <- max(mtx.color.range)
   if(fc){
@@ -154,16 +155,17 @@ plot_contact_map <- function(contact.map, fc = FALSE, breaks = 100, zeros.na = T
 #' @param colors.pal colors for pallette
 #' @param color.range numeric vector of length 2 or NULL; if specified gives minimum and maximum values for color scale; this is manual adjustment of scale
 #' @param sqrt.transform logical if TRUE apply sqrt transformation: sqrt(pos) to positive elements of matrix and -sqrt(abs(neg)) to negative elements of matrix
+#' @param useRaster logical if TRUE (default) lower quality image is produced, but the process is much faster and resulting file uses little space
 #'
 #' @return NULL
 #'
-#' @seealso \code{\link{CopulaHiC::iamge_plot_na}} for function handling heatmap plotting
+#' @seealso \code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
 #'
 #' @examples
 #' # get sample contact map (MSC replicate 1) for chromosome 18
-#' mtx1.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
+#' mtx1.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-1_40kb-raw"]][["18"]]
 #' # get another sample contact map (MSC replicate 2) for chromosome 18
-#' mtx2.sparse <- CopulaHiC::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
+#' mtx2.sparse <- DIADEM::sample_hic_maps[["MSC-HindIII-2_40kb-raw"]][["18"]]
 #' # make differential map
 #' merged <- base::merge(mtx1.sparse, mtx2.sparse, by = c("i", "j"))
 #' merged$difference <- merged$val.x - merged$val.y
@@ -178,7 +180,7 @@ plot_diff_map <- function(mtx.dense, zeros.na = TRUE, breaks = 10,
                           colors.pal = c("blue","white","red"),
                           color.range = NULL, sqrt.transform = FALSE,
                           na.color = 'black', neg.inf.color = "gold",
-                          pos.inf.color = "darkgreen", ...){
+                          pos.inf.color = "darkgreen", useRaster = TRUE, ...){
   mtx <- mtx.dense
   if(zeros.na){
     mtx[mtx == 0] <- NA
@@ -257,13 +259,13 @@ plot_pc_vector <- function(pc, colors=c("blue","red"), ...){
 #' # plot contact map or differential map - see ?plot_diff_map
 #' plot_diff_map(dense, sqrt.transform = TRUE)
 #' # then get tads and plot them
-#' tads <- CopulaHiC::sample_tads[["MSC-HindIII-1_40kb-raw"]]
+#' tads <- DIADEM::sample_tads[["MSC-HindIII-1_40kb-raw"]]
 #' tads18 <- tads[tads$name == "18",]
 #' plot_regions(tads18[c("start","end")])
 #' # for plotting differential interactions see ?differential_interactions
 #'
 #' @export
-plot_regions <- function(regions, pal.colors = NULL){
+plot_regions <- function(regions, pal.colors = NULL, lty = 1, lwd = 0.5){
   # regions - data drame must have 2 or 4 columns and optionally one additional column
   # - 2 columns is for TAD plotting --> in which case first column is start and the other is end
   # - 4 columns is for differential regions plotting --> x.start, x.end, y.start, y.end
@@ -293,7 +295,7 @@ plot_regions <- function(regions, pal.colors = NULL){
   l <- split(regions, regions$category)
   for(i in seq(1,length(l))){
     df <- l[[i]]
-    rect(df$xs, df$ys, df$xe, df$ye, col = NA, border = pal.colors[i], lty = 1, lwd = 0.5)
+    rect(df$xs, df$ys, df$xe, df$ye, col = NA, border = pal.colors[i], lty = lty, lwd = lwd)
   }
 }
 
@@ -313,7 +315,7 @@ plot_regions <- function(regions, pal.colors = NULL){
 #'
 #' @examples
 #' # get Hi-C map file
-#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' # read it and take chromosome 18
 #' m.sparse18 <- read_npz(mtx.fname, mtx.names = c("18"))[["18"]]
 #' dense <- sparse2dense(m.sparse18[c("i","j","val")], N = 1952)
@@ -358,27 +360,52 @@ plot_with_inset <- function(args.map, xlim, ylim,which.map = c("contact.map","di
   #}
 }
 
-#' Plots bivariate 2D density plot (heatmap).
+#' Creates expected vs observed plot for given Hi-C GLM
 #'
-#' @param data data frame with columns U,V ~ Uniform(0,1)
-#' @param palette character, Rcolor palette, by default RdBu
-#' @param direction numeric 1 or -1 (revert color palette)
-#'
-#' @return ggplot object
-#'
-#' @seealso \code{\link{CopulaHiC::copula_pvals}} for nice example of this function usage
-#'
-#' @examples
-#' # see ?CopulaHiC::copula_pvals
+#' Creates list of lists wtih plots. Each list contains a 2 element list for given model (usually chromosome), where 2 entries are: model Y | X and X | Y
 #'
 #' @export
-plot_copula_density <- function(data, palette = "RdBu", direction = -1){
-  df <- as.data.frame(data)
-  colnames(df) <- c("u","v")
-  ggplot(df, aes(x = u, y = v)) +
-    stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
-    scale_fill_distiller(palette = palette, direction = direction) +
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(expand = c(0, 0)) +
-    theme(legend.position='none')
+plotHiCglm <- function(hic.glm, diagonals = "all", N = 30, ncol = NULL){
+  lapply(names(hic.glm$model), function(n){
+    model <- hic.glm$model[[n]]
+    if(diagonals[1] == "all"){
+      diagonals <- names(model)
+    }
+    lapply(c("x","y"), function(which.model){
+      lapply(diagonals, function(k){
+        l <- model[[k]]
+        dataset <- l[["data"]]
+        mdl <- l[[paste0("model.", which.model)]]
+        predictor <- paste0("val.transformed.", which.model)
+        mu <- predict(mdl, newdata = data.frame(predictor = dataset[,predictor]))
+        predictor.mu <- cbind(dataset[,predictor], mu)
+        if(mdl[["family"]]$link == "log"){
+          inv.link <- function(v) exp(v)
+        }
+        if(mdl[["family"]]$link == "sqrt"){
+          inv.link <- function(v) v ** 2
+        }
+        lapply(1:nrow(predictor.mu), function(i){
+          if(mdl[["family"]]$family == "poisson"){
+            r <- rpois(N, inv.link(predictor.mu[i,2]))
+          } else {
+            r <- MASS::rnegbin(N, inv.link(predictor.mu[i,2]), theta = mdl$theta)
+          }
+          data.frame(predictor = predictor.mu[i,1], response = r, diagonal = as.numeric(k), type = "expected")
+        }) %>% do.call("rbind", .) -> expected
+        cn <- c(predictor, paste0("val.", setdiff(c("x", "y"), which.model)), "diagonal")
+        rbind(
+          expected,
+          magrittr::inset(magrittr::set_colnames(dataset[cn], c("predictor","response","diagonal")), "type", value = "observed")
+        )
+      }) %>% do.call("rbind", .) -> exp.obs
+      if(is.null(ncol)){
+        ncol <- ceiling(length(diagonals) ^ 0.5)
+      }
+      ggplot2::ggplot(exp.obs, ggplot2::aes(x = predictor, y = response, color = type)) +
+        ggplot2::geom_point(size = 0.2) +
+        ggplot2::facet_wrap(~ diagonal, scales = "free", ncol = ncol) +
+        ggplot2::theme(legend.position = "bottom")
+    }) %>% magrittr::set_names(c("Y | X","X | Y"))
+  }) %>% magrittr::set_names(names(hic.glm$model))
 }

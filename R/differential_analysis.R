@@ -21,11 +21,11 @@
 #'
 #' @examples
 #' # get path of first sample maps
-#' mtx1.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx1.fname <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' # get path of second sample maps
-#' mtx2.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+#' mtx2.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 #' # get sample TADs
-#' tads <- CopulaHiC::sample_tads[c("IMR90-MboI-1_40kb-raw", "MSC-HindIII-1_40kb-raw")]
+#' tads <- DIADEM::sample_tads[c("IMR90-MboI-1_40kb-raw", "MSC-HindIII-1_40kb-raw")]
 #' # construct HiCcomparator object for chromosomes 18 and 19
 #' hic.comparator <- HiCcomparator(mtx1.fname, mtx2.fname, tads, mtx.names = c("18","19"))
 #' # plot A/B compartments for first and second map in chromosome 19
@@ -33,7 +33,8 @@
 #' plot_pc_vector(hic.comparator$pc1.maps2[["19"]]) # second map
 #'
 #' @export
-HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.tads = 4, do.pca = FALSE){
+HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.tads = 4,
+                          do.pca = FALSE, zscore = FALSE, props = FALSE){
   # read HiC contact maps
   maps1 <- read_npz(path1, mtx.names = mtx.names)
   maps2 <- read_npz(path2, mtx.names = mtx.names)
@@ -42,6 +43,29 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
   }
   if(any(sapply(maps2, function(df){ any(df$val %% 1 != 0) }))){
     warning(paste0("HiC map specified as ", path2, " have non integer elements! This may influence comparative analysis!"))
+  }
+  # calculate number of interactions per diagonal in map 1
+  N1 <- lapply(names(maps1), function(x){
+    sapply(split(maps1[[x]], maps1[[x]]$diagonal), function(df) sum(df$val))
+  }) %>% magrittr::set_names(names(maps1))
+  # calculate number of interactions per diagonal in map 2
+  N2 <- lapply(names(maps2), function(x){
+    sapply(split(maps2[[x]], maps2[[x]]$diagonal), function(df) sum(df$val))
+  }) %>% magrittr::set_names(names(maps2))
+  if(props){
+    lapply(names(maps1), function(x) proportions(maps1[[x]])) %>%
+      magrittr::set_names(names(maps1)) -> maps1
+    lapply(names(maps2), function(x) proportions(maps2[[x]])) %>%
+      magrittr::set_names(names(maps2)) -> maps2
+  }
+  if(zscore){
+    # zscore every diagonal
+    lapply(names(maps1), function(x){
+      interactions2zscores(maps1[[x]])
+    }) %>% magrittr::set_names(names(maps1)) -> maps1
+    lapply(names(maps2), function(x){
+      interactions2zscores(maps2[[x]])
+    }) %>% magrittr::set_names(names(maps2)) -> maps2
   }
   # get datasets names
   data.names <- c(sub('\\..*$','', basename(path1)), sub('\\..*$','', basename(path2)))
@@ -105,8 +129,8 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
   }
 
   structure(
-    list(maps1, maps2, maps1.pc1, maps2.pc1, domains, data.names, sizes) %>%
-      magrittr::set_names(c("maps1", "maps2", "pc1.maps1", "pc1.maps2", "tads", "data.names", "maps.dims")),
+    list(maps1, maps2, maps1.pc1, maps2.pc1, domains, data.names, sizes, N1, N2) %>%
+      magrittr::set_names(c("maps1", "maps2", "pc1.maps1", "pc1.maps2", "tads", "data.names", "maps.dims", "N1", "N2")),
     class = "HiCcomparator"
   )
 }
@@ -262,290 +286,181 @@ decay_correlation.HiCcomparator <- function(hic.comparator){
   }) %>% do.call("rbind",.)
 }
 
-#' An S3 object to represent Hi-C copula model.
+#' Constructs GLM to model per-diagonal Hi-C contact dependancy
 #'
-#' Models diagonal-wise dependencies between Hi-C data sets with copulas. Model is constructed as follows:
+#' Models Hi-C contacts using Negative Binomial (or Poisson when the data is underdispersed) regression. Given the fact that Hi-C data suffers from contact decay bias this method is intendent to model each diagonal separately.
+#'
+#' @param df data frame with predictor, response, outlier columns
+#' @param link character link to be used in GLM
+#' @param try.poisson logical if true then use Poisson regression instead of NB anytime warning is generated when fitting NB model indicating MLE convergence issue
+#'
+#' @return object of class glm or MASS::glm.nb
+#'
+#' @seealso \code{\link{glm}}, \code{\link{MASS::glm.nb}} to see how GLM are constructed
+#'
+#' @export
+constructGLM <- function(df, link, try.poisson = TRUE){
+  stopifnot(link %in% c("log", "sqrt"))
+  tryCatch({
+    if(link == "log"){
+      model <- MASS::glm.nb(response ~ predictor, data = df[df$outlier == "no",], link = "log")
+    } else {
+      model <- MASS::glm.nb(response ~ predictor, data = df[df$outlier == "no",], link = "sqrt")
+    }
+    if(try.poisson & !is.null(model$th.warn)){
+      if(link == "log"){
+        model <- glm(response ~ predictor, data = df[df$outlier == "no",], family = poisson(link = "log"))
+      } else {
+        model <- glm(response ~ predictor, data = df[df$outlier == "no",], family = poisson(link = "sqrt"))
+      }
+    }
+  }, error = function(e){
+    model <- NULL
+  })
+  return(model)
+}
+
+#' An S3 object to represent differential GLM Hi-C model.
+#'
+#' Models diagonal-wise dependencies between Hi-C data sets with GLM. Model is constructed as follows:
 #' \itemize{
 #'   \item{}{merge maps1 with maps2}
 #'   \item{}{for each diagonal in diagonals}
 #'   \itemize{
 #'     \item{}{take all points from this diagonal, such that they are non zero in map1 (X) and non zero in map2 (Y)}
-#'     \item{}{model X with gamma distribution}
-#'     \item{}{model Y with gamma distribution}
-#'     \item{}{transform X and Y to U and V ~ Uniform(0,1) - see \code{\link{VineCopula::pobs}}}
-#'     \item{}{model F(U,V) with copula (see \code{\link{VineCopula::BiCopSelect}})}
+#'     \item{}{remove outliers using robust regression (recommended)}
+#'     \item{}{apply transformation to predictor variable (X or Y): log or sqrt depending on link function}
+#'     \item{}{model response (Y = f(X) or X = f(Y)) using Negative Binomial distribution with appropriate link function}
 #'   }
 #' }
-#' Before fitting the model it's recommended to first inspect correlations between analyzed Hi-C maps before fixing this variable. As the ratio of noise / signal in Hi-C data increases rapidly with decay it's unadvised to use all diagonals for modelling. The number of diagonals to be used will depend on chromosome length, resolution and data quality. As a rule of thumb the number of diagonals should not exceed 0.2 times length of chromosome.
+#' Before fitting the model it's recommended to first inspect correlations between analyzed Hi-C maps before fixing this variable. As the ratio of noise / signal in Hi-C data increases rapidly with decay it's unadvised to use all diagonals for modelling. The number of diagonals to be used will depend on chromosome length, resolution and data quality. As a rule of thumb the number of diagonals should not exceed 0.1 times length of chromosome.
 #'
 #' @param hic.comparator object of type HiCcomparator
 #' @param diagonals fraction or numeric vector or character "all" which diagonals to use to fit models, by default fraction of chromsome length is used to indicate number of diagonals.
-#' @param include.zero.cells logical, whether to include cells when merging maps (see \code{\link{merge.HiCcomparator}})
-#' @param n.cores numeric number of cores to distribute model computations
+#' @param remove.outliers logical if true try to remove outliers before fitting proper model (NB regression) using robust regression (IRLS) with bisquare weight function
+#' @param outlier.weight numeric weight threshold to remove outliers
+#' @param link character either log or sqrt - link function for NB regression
 #'
-#' @return S3 object of class HiCcopula
+#' @return S3 object of class HiCglm
 #'
-#' @seealso \code{\link{HiCcomparator}} on how to construct HiCcomparator object, \code{\link{fitdistrplus::fitdist}} on distribution fitting, \code{\link{VineCopula::pobs}} on pseudo observations generation and \code{\link{VineCopula::BiCopSelect}} on finding optimal fit bivariate copula
+#' @seealso \code{\link{HiCcomparator}} on how to construct HiCcomparator object and \code{\link{robustreg::robustRegBS}} on how robust regression is performed and outliers selection process
 #'
 #' @examples
-#' # first create HiCcomparator object - see ?HiCcomparator for examples
-#' # construct model
-#' hic.copula <- HiCcopula(hic.comparator)
-#' # load below packages for visualisation
-#' library("fitdistrplus")
-#' library("VineCopula")
-#' # illustrate gamma fit of X and Y for chromosome 18, diagonal 5
-#' plot(copula$model[["18"]][["5"]]$marginal.x)
-#' plot(copula$model[["18"]][["5"]]$marginal.y)
-#' # illustrate copula fit of U and V for chromosome 18, diagonal 5
-#' plot(copula$model[["18"]][["5"]]$bf.copula)
 #'
 #' @export
-HiCcopula <- function(hic.comparator, diagonals = 0.12, include.zero.cells = FALSE, n.cores = 1){
-  merged <- merge(hic.comparator, include.zero.cells = include.zero.cells)
-  names.merged <- names(merged)
-  lapply(names.merged, function(n){
+HiCglm <- function(hic.comparator, diagonals = 0.1, remove.outliers = TRUE, outlier.weight = 0, link = c("log", "sqrt")[1]){
+  stopifnot(link %in% c("log", "sqrt"))
+  merged <- merge(hic.comparator, include.zero.cells = FALSE)
+  nm <- names(merged)
+  lapply(nm, function(n){
     merged.n <- merged[[n]]
     # split by diagonals
-    merged.n.diagonals <- split(merged.n, merged.n$diagonal)
-    if(is.character(diagonals)){
-      diagonals <- names(merged.n.diagonals)
+    md <- split(merged.n, merged.n$diagonal)
+    if(diagonals[1] == "all"){
+      diagonals <- names(md)
     } else if((length(diagonals) == 1) & (diagonals < 1)){
       m <- round(diagonals * hic.comparator$maps.dims[[n]][1,1])
-      diagonals <- seq(1,m)
+      diagonals <- as.character(seq(1,m))
+    } else {
+      diagonals <- as.character(diagonals)
     }
-    # calculate models for every diagonal
-    parallel::mclapply(merged.n.diagonals[as.character(diagonals)], FUN = function(df){
-      # fit gamma distribution for marginals
-      marginal.x <- tryCatch({
-        fitdistrplus::fitdist(df$val.x, distr = "gamma", method = "mle")
-      }, error = function(e){
-        NULL
-      })
-      marginal.y <- tryCatch({
-        fitdistrplus::fitdist(df$val.y, distr = "gamma", method = "mle")
-      }, error = function(e){
-        NULL
-      })
-      # find best fit copula
-      bf.copula <- tryCatch({
-        pseudo.observations <- VineCopula::pobs(df[,c("val.x","val.y")])
-        u <- pseudo.observations[,1]
-        v <- pseudo.observations[,2]
-        VineCopula::BiCopSelect(u,v, familyset = NA)
-      }, error = function(e){
-        NULL
-      })
-      # return result as  list with:
-      # - marginal distribution of X
-      # - marginal distribution of Y
-      # - best fit copula
-      list(marginal.x, marginal.y, bf.copula) %>%
-        magrittr::set_names(c("marginal.x", "marginal.y", "bf.copula"))
-    }, mc.cores = n.cores)
-  }) %>% magrittr::set_names(names.merged) -> model
-  # return result
-  structure(list(hic.comparator$data.names, names(merged), hic.comparator$maps.dims, merged, model) %>%
-              magrittr::set_names(c("data.names", "names", "maps.dims", "merged", "model")),
-            class = "HiCcopula")
-}
-
-#' Compute depletion or enrichment p-value given copula model.
-#'
-#' Calculates p-value of enrichment or depletion of given point/s with u,v coordinates given copula F(U,V):
-#' \itemize{
-#'   \item{}{depletion probability is defined as: P(U < u, V > v) = F(U < u, V < 1) - F(U < u, V < v), so its upper left rectangle of copula distribution}
-#'   \item{}{enrichment probability is defined as: P(U > u, V < v) = F(U < 1, V < v) - F(U < u, V < v), so its lower right rectangle of copula distribution}
-#' }
-#' NOTES:
-#' \itemize{
-#'   \item{}{copula is symmetric with respect to U = V}
-#'   \item{}{enrichment is relative to condition u = F(X < x), in other words enriched means chromatin is enriched in interactions in conditon X comparing with Y}
-#'   \item{}{P(U,V) distribution can be plotted as U horizontal and increasing from left (start at 0) to right (ends at 1) and V vertical and increasing from bottom (start at 0) to top (ends at 1)}
-#'   \item{}{both uv and model is for single (and the same) diagonal}
-#'   \item{}{uv must all be points for either top left (depletion) or bottom right (enrichment) part of distribution}
-#' }
-#' For calculation of copula cdf \code{\link{VineCopula::BiCopCDF}} is used.
-#'
-#' @param uv matrix of dimension n x 2 with U,V r.v. ~ Uniform(0,1), see \code{\link{VineCopula::pobs}} for generation of U,V from X,Y; here U,V matrix must be such that either U >= V (lower.right corner) or U <= V (upper.left corner)
-#' @param copula.model object of class \code{\link{VineCopula::BiCop}}
-#' @param copula.tail character indicating tail (corner) of copula to calculate cdf, either "upper.left" or "lower.right"
-#'
-#' @return numeric vector of p-value/s of length equal to \code{nrow(uv)}
-#'
-#' @examples
-#' library("copula")
-#' library("MASS")
-#' # make bivariate standard normal copula of highly correlated variables (0.8)
-#' cop <- BiCop(1, 0.8)
-#' # convert to package copula class --> for illustration purposes
-#' cop.copula.object <- copulaFromFamilyIndex(cop$family, cop$par)
-#' # illustrate copula
-#' persp(cop.copula.object, dCopula) # 3D
-#' contourplot2(cop.copula.object, dCopula, col.regions = terrain.colors) # 2D heatmap
-#' # simulate sample of size 10000 and draw copula 2d density plot (heatmap)
-#' sample.cop <- data.frame(rCopula(10000, cop.copula.object))
-#' plot_copula_density(sample.cop) # 2D heatmap with ggplot
-#' # now simulate sample from bivariate standard normal with much lower correlation than that of copula
-#' sigma <- matrix(c(1, 0.4, 0.4, 1), nrow = 2)
-#' xy <- mvrnorm(500, mu = c(0, 0), Sigma = sigma, empirical = T)
-#' # convert X,Y to U,V ~ Uniform(0,1) using copula::pobs
-#' uv <- pobs(xy)
-#' # keep only upper V >= U (\code{copula_pvals} calculates p-values separately for V >= U and U >= V)
-#' uv <- uv[uv[,2] >= uv[,1],]
-#' # illustrate observations on top of copula density
-#' uv.df <- data.frame(uv)
-#' colnames(uv.df) <- c("U","V")
-#' plot_copula_density(sample.cop) + geom_point(aes(x = U, y = V), data = uv.df, size = 0.5)
-#' # calculate p-values of observations given the copula model (use only )
-#' uv.df$pval <- copula_pvals(uv, cop)
-#' # convert to pvalues to negative log10(pval)
-#' uv.df$neg.log.pval <- -log10(uv.df$pval)
-#' # illustrate observations significance on top of copula model
-#' plot_copula_density(sample.cop) + geom_point(aes(x = U, y = V, color = neg.log.pval), data = uv.df, size = 0.3) + scale_color_gradient(low = "yellow", high = "black", name = "-log10(pval)")
-copula_pvals <- function(uv, copula.model, copula.tail = "upper.left"){
-  # for some reason if copula family = 214 (Rotated Tawn type 2 180 degrees)
-  # the cdf = NaN if u = 1 or v = 1, so sloppy workaround is to set them
-  # as close to 1 as possible to not yield NaN, which is 0.9999999999999999
-  if(copula.model$family == 214){
-    one <- 0.9999999999999999
-  } else {
-    one <- 1.0
-  }
-  if(copula.tail == "upper.left"){
-    # V >= U
-    stopifnot(all(uv[,2] >= uv[,1]))
-    u1 <- uv[,1]
-    v1 <- rep(one, nrow(uv))
-  } else {
-    # lower right tail --> U >= V
-    stopifnot(all(uv[,1] >= uv[,2]))
-    u1 <- rep(one, nrow(uv))
-    v1 <- uv[,2]
-  }
-  cdf1 <- VineCopula::BiCopCDF(u1, v1, family = copula.model$family, par = copula.model$par, par2 = copula.model$par2)
-  cdf2 <- VineCopula::BiCopCDF(uv[,1], uv[,2], family = copula.model$family, par = copula.model$par, par2 = copula.model$par2)
-  return(cdf1 - cdf2)
-}
-
-#' Computes p-values given copula model.
-#'
-#' Given copula model for diagonal of Hi-C contact map it calculates deviation from this model (p-values) in both directions (i.e. depletion and enrichment). It divides U,V matrix on 3 groups: U > V (enrichment), U == V (no effect), U < V (depletion) and calls \code{\link{copula_pvals}} for each group. Afterwards it merge results.
-#'
-#' @param uv matrix of dimension n x 2 with U,V r.v. ~ Uniform(0,1), see \code{\link{VineCopula::pobs}} for generation of U,V from X,Y
-#' @param copula.model object of class \code{\link{VineCopula::BiCop}}
-#' @param mht.correction logical whether to apply Benjamini Hochberg correction for multiple hypothesis testing since we are testing a number of hypothesis (diagonal cells) against null model
-#'
-#' @return data frame with columns: u, v, effect, p.value, p.value.corrected
-#'
-#' @seealso \code{\link{copula_pvals}} for p-value calculation
-#'
-#' @examples
-#' # see copula_pvals function
-maps_difference_diagonal <- function(uv, copula.model, mht.correction = TRUE){
-  list(
-    uv[uv[,1] > uv[,2],],
-    uv[uv[,1] == uv[,2],],
-    uv[uv[,1] < uv[,2],]
-  ) %>% magrittr::set_names(c("enrichment", "none", "depletion")) %>%
-    magrittr::extract(sapply(., nrow) > 0) -> l
-  lapply(names(l), function(x){
-    df <- l[[x]]
-    if(nrow(df)){
-      if(x == "enrichment"){
-        copula.tail <- "lower.right"
-      } else {
-        copula.tail <- "upper.left"
+    # build models
+    lapply(diagonals, function(k){
+      df <- md[[k]]
+      # remove outliers if required
+      df$outlier <- "no"
+      if(remove.outliers){
+        tryCatch({
+          fit <- robustreg::robustRegBS(val.y ~ val.x, data = df)
+          df[which(fit$weights <= outlier.weight), "outlier"] <- "yes"
+        }, error = function(e){
+          warning(paste0("Failed to perform IRLS for diagonal ",k))
+        })
       }
-      p.vals <- copula_pvals(df, copula.model, copula.tail = copula.tail)
-      cbind(df, effect = x, p.value = p.vals)
-    }
-  }) %>%
-    magrittr::extract(! sapply(., is.null)) %>%
-    do.call("rbind",.) -> result
-  if(mht.correction){
-    result$p.value.corrected <- p.adjust(result$p.value, method = "BH")
+      # build model for enrichment in Y
+      df$val.transformed.x <- get(link)(df$val.x) # transform predictor
+      model.x <- constructGLM(data.frame(predictor = df$val.transformed.x, response = df$val.y, outlier = df$outlier), link)
+      # build model for enrichment in X
+      df$val.transformed.y <- get(link)(df$val.y) # transform predictor
+      model.y <- constructGLM(data.frame(predictor = df$val.transformed.y, response = df$val.x, outlier = df$outlier), link)
+      # results
+      list(df, model.x, model.y) %>% magrittr::set_names(c("data","model.x","model.y"))
+    }) %>% magrittr::set_names(diagonals)
+  }) %>% magrittr::set_names(nm) -> model
+  # return result
+  structure(list(hic.comparator$data.names, hic.comparator$maps.dims, model) %>%
+              magrittr::set_names(c("data.names", "maps.dims", "model")),
+            class = "HiCglm")
+}
+
+#' Computes significance of data given the model
+#'
+#' Uses either Negative Binomial or Poisson to calculate pvalue of Y | X or X | Y.
+#'
+#' @param dataset data frame with predictor, response, outlier columns
+#' @param model object of type glm or MASS::glm.nb class
+#'
+#' @return numeric vector with p-values (upper tail)
+#'
+#' @seealso \code{\link{pnbinom}}, \code{\link{ppois}} to see how to calculate significance
+#'
+#' @export
+significance <- function(dataset, model){
+  stopifnot(model[["family"]]$link %in% c("log", "sqrt"))
+  if(model[["family"]]$link == "log"){
+    inv.link <- function(v) exp(v)
   }
-  return(result)
+  if(model[["family"]]$link == "sqrt"){
+    inv.link <- function(v) v ** 2
+  }
+  mu <- predict(model, newdata = dataset)
+  mu.muhat <- cbind(dataset$response, mu)
+  sapply(1:nrow(mu.muhat), function(i){
+    if(model[["family"]]$family == "poisson"){
+      ppois(mu.muhat[i,1], inv.link(mu.muhat[i,2]), lower.tail = FALSE)
+    } else {
+      pnbinom(mu.muhat[i,1], size = model$theta, mu = inv.link(mu.muhat[i,2]), lower.tail = FALSE)
+    }
+  })
 }
 
 #' @export
 hicdiff <- function(x, ...) UseMethod("hicdiff", x)
 
-#' Computes differential (p-value) map.
+#' Computes differential (p-value/q-value) map.
 #'
-#' Given HiCcopula object calculates depletion/enrichment p-values of cell along diagonals w.r.t. background copula models (separate for every diagonal, see \code{\link{HiCcopula} for details}).
+#' Given HiCglm object calculates enrichment p-values of Y | X or X | Y w.r.t. background models (separate for every diagonal, see \code{\link{HiCglm} for details}).
 #'
-#' @param hic.copula object of class HiCcopula
+#' @param hic.glm object of class HiCglm
 #' @param marginal.distr character wither fit or obs; if fit then fitted gamma distribution for X and Y is used to convert them to U and V respectively
 #'
-#' @return list of data frames corresponding to Hi-C contact maps; each data frame contain columns: i, j, name, val.x, val.y, u, v, effect, p.value, p.value.corrected
+#' @return list of data frames corresponding to Hi-C contact maps; each data frame contain columns: i, j, name, val.x, val.y, pvalue.x, qvalue.x, pvalue.y, qvalue.y where suffix indicates predictor variable, i.e. pvalue.x indicates E[Y | X] model, so resulting significance means enrichment of Y w.r.t. X
 #'
-#' @seealso \code{\link{HiCcopula}} on how to construct HiCcopula, \code{\link{maps_difference_diagonal}} and \code{\link{copula_pvals}} on how p-values are calculated
+#' @seealso \code{\link{HiCglm}} on how to construct HiCglm, \code{\link{maps_difference_diagonal}} and \code{\link{significance}} on how p-values are calculated
 #'
 #' @examples
-#' # first create HiCcopula object - see ?HiCcopula for examples
-#' # calculate p-values and select chromosome of interest (18 in this example)
-#' md <- hicdiff(hic.copula)[["18"]]
-#' # convert corrected p-values to -log10(pvals)
-#' md$neg.log.cor.pvals <- md$p.value.corrected
-#' # make neg.log.cor.pvals negative for depleted cells
-#' md[md$effect == "depletion", "neg.log.cor.pvals"] <- -md[md$effect == "depletion", "neg.log.cor.pvals"]
-#' # convert sparse matrix to dense matrix
-#' dense <- sparse2dense(md[c("i","j","neg.log.cor.pvals")], N = hic.copula$maps.dims[["18"]][1,1])
-#' # plot results
-#' plot_diff_map(dense)
 #'
 #' @export
-hicdiff.HiCcopula <- function(hic.copula, marginal.distr = c("fit","obs")[1]){
-  # TODO: add assertion if data (contacts) are reals (i.e.: normalized data) and marginal.distr is obs
-  lapply(hic.copula$names, function(n){
-    merged <- hic.copula$merged[[n]]
-    merged.diagonals <- split(merged, merged$diagonal)
-    model <- hic.copula$model[[n]]
+hicdiff.HiCglm <- function(hic.glm){
+  model <- hic.glm$model
+  lapply(names(model), function(n){
+    model.n <- model[[n]]
     # compute p values for every diagonal in model
-    lapply(names(model), function(m){
-      model.diagonal <- model[[m]]
-      merged.diagonal <- merged.diagonals[[m]]
-      tryCatch({
-        if(marginal.distr == "fit"){
-          # get gamma parameters
-          x.estimate <- model.diagonal$marginal.x[["estimate"]]
-          y.estimate <- model.diagonal$marginal.y[["estimate"]]
-          # calculate u, v
-          u <- pgamma(merged.diagonal$val.x, x.estimate["shape"], rate = x.estimate["rate"])
-          v <- pgamma(merged.diagonal$val.y, y.estimate["shape"], rate = y.estimate["rate"])
-        } else {
-          # calculate observed probability for vector of counts for x
-          counts.x <- as.data.frame(table(as.factor(merged.diagonal$val.x)))
-          counts.x$Freq %>% divide_by(sum(counts.x$Freq)) %>% magrittr::set_names(counts.x$Var1) -> pobs.x
-          u <- pobs.x[as.character(merged.diagonal$val.x)]
-          # calculate observed probability for vector of counts for y
-          counts.y <- as.data.frame(table(as.factor(merged.diagonal$val.y)))
-          counts.y$Freq %>% divide_by(sum(counts.y$Freq)) %>% magrittr::set_names(counts.y$Var1) -> pobs.y
-          v <- pobs.y[as.character(merged.diagonal$val.y)]
-        }
-        uv <- data.frame(u = u, v = v, idx = rownames(merged.diagonal))
-        pvals <- maps_difference_diagonal(uv, model.diagonal$bf.copula)
-        base::merge(merged.diagonal[c("i","j","name","val.x","val.y")],
-                    pvals, by.x = "row.names", by.y = "idx")
-      }, error = function(e){
-        # one of the models is NULL
-        missing.models <- c()
-        if(is.null(model.diagonal$marginal.x)){
-          missing.models <- c(missing.models, "marginal x")
-        }
-        if(is.null(model.diagonal$marginal.y)){
-          missing.models <- c(missing.models, "marginal y")
-        }
-        if(is.null(model.diagonal$bf.copula)){
-          missing.models <- c(missing.models, "copula")
-        }
-        warning(paste0("On diagonal ",m," following models are missing: ", paste(missing.models, collapse = ", "), "... I am skipping this diagonal!"))
-        return(NULL)
-      })
+    lapply(names(model.n), function(k){
+      l <- model.n[[k]]
+      dataset <- l[["data"]]
+      model.x <- l[["model.x"]]
+      model.y <- l[["model.y"]]
+      # enrichment for: Y | X
+      px <- significance(data.frame(predictor = dataset$val.transformed.x, response = dataset$val.y),
+                         l[["model.x"]])
+      # enrichment for: X | Y
+      py <- significance(data.frame(predictor = dataset$val.transformed.y, response = dataset$val.x),
+                         l[["model.y"]])
+      magrittr::inset(dataset, c("pvalue.x", "qvalue.x", "pvalue.y", "qvalue.y"),
+                      value = cbind(px, p.adjust(px, method = "BH"), py, p.adjust(py, method = "BH")))
     }) %>% do.call("rbind",.)
-  }) %>% magrittr::set_names(hic.copula$names)
+  }) %>% magrittr::set_names(names(model))
 }
 
 #' Converts significance maps to dense matrices.
@@ -553,40 +468,45 @@ hicdiff.HiCcopula <- function(hic.copula, marginal.distr = c("fit","obs")[1]){
 #' Given list of significance maps in sparse format produced by \code{\link{hicdiff}} function converts them to dense matrix format.
 #'
 #' @param hicdiff.list list of data frames, output from \code{\link{hicdiff}} function
-#' @param maps.dims list of data frames, usually an attribute of HiCcopula object that was used to produce hicdiff.list
-#' @param val.column character indicating which column of sparse significance map to use as cell value for dense matrix (one of p.value or p.value.corrected)
-#' @param neg.log logical wheter to apply -log10(.) to val.column
-#' @param mark.depleted logical whether to mark depleted cells as negative
+#' @param maps.dims list of data frames, usually an attribute of HiCglm object that was used to produce hicdiff.list
+#' @param val.column character indicating which column of sparse significance map to use as cell value for dense matrix (either pvalue or qvalue)
+#' @param neg.log logical wheter to apply -log transformation to val.column
+#' @param which.enrichment character indicating whether to calculate Y enrichment (i.e. E[Y | X] model) - choose y, X enrichment (i.e. E[X | Y] model) - choose x or both
 #'
-#' @return list with dense matrices
+#' @return list with dense matrices containing significance in each cell; when which.enrichment is fixed to both upper triangular map will contain significances of E[Y | X] model and lower triangular will contain significances of E[X | Y]
 #'
 #' @seealso \code{\link{hicdiff}} for generation of hicdiff.list
 #'
 #' @examples
-#' # first create HiCcopula object - see ?HiCcopula for examples
-#' # then produce hicdiff.list
-#' hicdiff.list <- hicdiff(hic.copula)
-#' dense.hicdiff.list <- hicdiff2mtx(hicdiff.list)
-#' # elements of dense.list can be visualized
-#' plot_diff_map(dense.hicdiff.list[["18"]], breaks = 100)
 #'
 #' @export
-hicdiff2mtx <- function(hicdiff.list, maps.dims, val.column = c("p.value.corrected","p.value")[1],
-                        neg.log = TRUE, mark.depleted = TRUE){
+hicdiff2mtx <- function(hicdiff.list, maps.dims, val.column = c("qvalue","pvalue")[1],
+                        neg.log = TRUE, which.enrichment = c("both", "x", "y")[1]){
+  stopifnot(val.column %in% c("qvalue","pvalue"))
+  stopifnot(which.enrichment %in% c("x", "y", "both"))
   names(hicdiff.list) %>%
     lapply(function(n){
       df <- hicdiff.list[[n]]
       md <- maps.dims[[n]]
       subdf <- df[c("i", "j")]
+      vx <- df[,paste0(val.column, ".x")]
+      vy <- df[,paste0(val.column, ".y")]
       if(neg.log){
-        subdf$val <- -log10(df[,val.column])
+        vx <- -log(vx)
+        vy <- -log(vy)
+      }
+      if(which.enrichment == "y"){
+        sparse2dense(magrittr::inset(subdf, "significance", value = vx), N = md[1,"n.rows"])
+      } else if(which.enrichment == "x"){
+        sparse2dense(magrittr::inset(subdf, "significance", value = vy), N = md[1,"n.rows"])
       } else {
-        subdf$val <- df[,val.column]
+        mtx.x <- sparse2dense(magrittr::inset(subdf, "significance", value = vx), N = md[1,"n.rows"])
+        mtx.y <- sparse2dense(magrittr::inset(subdf, "significance", value = vy), N = md[1,"n.rows"])
+        mtx <- matrix(0, nrow = md[1,"n.rows"], ncol = md[1,"n.cols"])
+        mtx[upper.tri(mtx.x)] <- mtx.x[upper.tri(mtx.x)]
+        mtx[lower.tri(mtx.y)] <- mtx.y[lower.tri(mtx.y)]
+        return(mtx)
       }
-      if(mark.depleted){
-        subdf[df$effect == "depletion","val"] <- -subdf[df$effect == "depletion","val"]
-      }
-      sparse2dense(subdf, N = md[1,"n.rows"])
     }) %>% magrittr::set_names(names(hicdiff.list))
 }
 
@@ -598,8 +518,8 @@ differential_interactions <- function(x, ...) UseMethod("differential_interactio
 #' This function works in 3 steps:
 #' \itemize{
 #'  \item{}{first it calculates differential map,}
-#'  \item{}{then it takes negative log10 p-value vector of cells, sorts it, divides on negative and positive parts and lastly fits bilinear model to each of them}
-#'  \item{}{finally it retains only those cells that are to the left (right) of intersection point of bilinear model in positive (negative) p-values vector and searches for connected components in both of them separately}
+#'  \item{}{then it takes negative log significance (qvalue) vector of cells, sorts it and fits bilinear model}
+#'  \item{}{finally it retains only those cells that are to the right of intersection point of bilinear model in significance vector (i.e. the most significant cells) and searches for connected components}
 #' }
 #' Fitting bilinear model is performed using \code{\link{best_fit_bilinear}} function, while for connected components search \code{\link{raster}} package is used. After detection of significantly interacting regions (connected components) one may further filter list to only retain those with number of non zero cells (n.cells column in interacting.regions data frame) larger than some threshold. There are 3 possible ways of selecting significant interactions (cells):
 #' \itemize{
@@ -609,32 +529,33 @@ differential_interactions <- function(x, ...) UseMethod("differential_interactio
 #' }
 #' When using option 1 and 3 its recommended to plot the fit (enabled by default). An indication of properly determined significance threshold would be when red vertical line (the significance threshold) is located to the right side of grey vertical line.
 #'
-#' @param hic.copula object of class HiCcopula
-#' @param plot.models logical if true then plot bilinear model fit for every matrix in hic.copula object; it will plot models for depleted and enriched models separately; if you want to save this results to file open device before calling this function (see for instance \code{\link{pdf}}) and close device after function call (see \code{\link{dev.off}})
-#' @param pval numeric, p-value cutoff to qualify interaction as significant
+#' @param hic.glm object of class HiCglm
+#' @param plot.models logical if true then plot bilinear model fit for every matrix in hic.glm object; it will plot bilinear fit for E[Y | X] and E[X | Y] models; if you want to save this results to file open device before calling this function (see for instance \code{\link{pdf}}) and close device after function call (see \code{\link{dev.off}})
+#' @param pval numeric, pvalue (or qvalue) cutoff to qualify interaction as significant
 #' @param sig.thr.selection numeric, if 3 then only use bilinear model fit to establish p-value cutoff for significant interactions, if 2 then select significant interactions using only \code{pval} parameter, if 1 (default) use bilinear model, but if p-value threshold is larger than \code{pval}, use \code{pval} instead
-#' @param which.significance character either "qval" or "pval" indicating, which of the 2 shold be used as a measure of interaction significance
+#' @param which.significance character either "qvalue" or "pvalue" indicating, which of the 2 should be used as a measure of interaction significance
 #' @param cc.direction specifies criterium for two cells to be considered as neighbors during connected components search, for details see \code{directions} parameter of \code{\link{raster::clump}} function
 #'
-#' @return list with number of entries equal to hic.copula$names; each entry is a list with 2 elements: interacting.regions - data frame containing rows with rectangle like regions of significant interactions with coordinates n.cells (number of non zero cells inside rectangle), start.x, end.x, start.y, end.y, effect; connected.components list with cells comprising given connected component; connected components list is named list where each entry name is unique id, which can be mapped to row in interacting.regions (its row names)
+#' @return list with number of entries equal to hic.glm$names; each entry is a list with 2 elements: interacting.regions - data frame containing rows with rectangle like regions of significant interactions with coordinates n.cells (number of non zero cells inside rectangle), start.x, end.x, start.y, end.y, effect; connected.components list with cells comprising given connected component; connected components list is named list where each entry name is unique id, which can be mapped to row in interacting.regions (its row names); effect column is indicating if interaction refers to Y enrichment (i.e. E[Y | X] model) or X enrichment (i.e. E[X | Y] model)
 #'
 #' @seealso \code{\link{best_fit_bilinear}} for fitting bilinear model, \code{\link{raster::raster}} and \code{\link{raster::clump}} for connected components search
 #'
 #' @examples
-#' # first create HiCcopula object - see ?HiCcopula for examples
-#' di <- differential_interactions(hic.copula)
-#' di18 <- di[["18"]]
-#' # if you want to plot results create pvalue map (see hicdiff function) and from that dense map for some chromosome
-#' plot_diff_map(dense)
-#' # plot regions having at least 10 significant cells in connected component
-#' plot_regions(di18[di18$n.cells >= 10,2:6], pal.colors = c("blue","red"))
 #'
 #' @export
-differential_interactions.HiCcopula <- function(hic.copula, plot.models = TRUE, pval = 0.05, sig.thr.selection = c(1,2,3)[1], which.significance = c("qval","pval")[1], cc.direction = c(4,8)[1]){
-  maps.difference <- hicdiff(hic.copula)
+differential_interactions.HiCglm <- function(hic.glm, sig.map = NULL, plot.models = TRUE, pval = 0.05, sig.thr.selection = c(1,2,3)[1], which.significance = c("qvalue","pvalue")[1], cc.direction = c(4,8)[1]){
+  if(is.null(sig.map)){
+    maps.difference <- hicdiff(hic.glm)
+  } else {
+    maps.difference <- sig.map
+  }
   lapply(names(maps.difference), function(n){
-    columns <- c("i","j","effect", ifelse(which.significance == "qval", "p.value.corrected", "p.value"))
-    df <- magrittr::set_colnames(maps.difference[[n]][columns], c("i", "j", "effect", "significance"))
+    df <- rbind(
+      magrittr::inset(maps.difference[[n]][c("i","j",paste0(which.significance, ".x"))],
+                      "effect", value = "Y enrichment") %>% magrittr::set_colnames(c("i","j","significance","effect")),
+      magrittr::inset(maps.difference[[n]][c("i","j",paste0(which.significance, ".y"))],
+                      "effect", value = "X enrichment") %>% magrittr::set_colnames(c("i","j","significance","effect"))
+    )
     df$significance <- -log10(df$significance)
     sig.thr <- -log10(pval)
     # group significantly depleted and enriched cells
@@ -658,7 +579,7 @@ differential_interactions.HiCcopula <- function(hic.copula, plot.models = TRUE, 
         }
         if(plot.models){
           plot(dfe$X, dfe$significance, cex = 0.1, xlab = "X", ylab = latex2exp::TeX("-log_{10}(significance)"))
-          title(paste0(hic.copula$data.names[1]," vs ",hic.copula$data.names[2],", ",n,", ",dfe[1,"effect"]), cex.main = 1)
+          title(paste0(hic.glm$data.names[1]," vs ",hic.glm$data.names[2],", ",n,", ",dfe[1,"effect"]), cex.main = 1)
           abline(a = bf[["coefficients"]]["left","intercept"], b = bf[["coefficients"]]["left","slope"], col = "green")
           abline(a = bf[["coefficients"]]["right","intercept"], b = bf[["coefficients"]]["right","slope"], col = "blue")
           legend.labels = c("bilinear model fit 1","bilinear model fit 2")
@@ -687,9 +608,11 @@ differential_interactions.HiCcopula <- function(hic.copula, plot.models = TRUE, 
       most.significant <- dfe[dfe$X >= x,]
       # connected components determination
       adjacency <- sparse2dense(most.significant[c("i","j","significance")],
-                                N = hic.copula$maps.dims[[n]][1,1])
+                                N = hic.glm$maps.dims[[n]][1,1])
       # convert negative or positive matrix of negative log p-values into adjacency matrix
       adjacency[adjacency != 0] <- 1
+      # take only upper triangular part as the matrix is symmetric
+      adjacency[lower.tri(adjacency)] <- 0
       rmat <- raster::raster(adjacency)
       clumps <- matrix(raster::clump(rmat, directions = cc.direction),
                        nrow = nrow(adjacency), ncol = ncol(adjacency), byrow = TRUE)
@@ -703,21 +626,20 @@ differential_interactions.HiCcopula <- function(hic.copula, plot.models = TRUE, 
     ids.neg <- ids[1:length(l[[1]])]
     ids.pos <- ids[(length(l[[1]]) + 1):length(ids)]
     # get data frame where each row is interaction with n.cells, start.x, end.x, start.y, end.y, effect and id as row name
-    res.df <- rbind(
-      sapply(l[[1]], function(cc){
-        c(nrow(cc), min(cc[,"col"]), max(cc[,"col"]), min(cc[,"row"]), max(cc[,"row"]))
-      }) %>% t() %>% as.data.frame() %>%
-        magrittr::set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
-        magrittr::inset("effect", value = "depletion") %>% magrittr::set_rownames(ids.neg),
-      sapply(l[[2]], function(cc){
-        c(nrow(cc), min(cc[,"col"]), max(cc[,"col"]), min(cc[,"row"]), max(cc[,"row"]))
-      }) %>% t() %>% as.data.frame() %>%
-        magrittr::set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
-        magrittr::inset("effect", value = "enrichment") %>% magrittr::set_rownames(ids.pos)
-    )
+    yenr <- sapply(l[[1]], function(cc){
+      c(nrow(cc), min(cc[,"col"]), max(cc[,"col"]), min(cc[,"row"]), max(cc[,"row"]))
+    }) %>% t() %>% as.data.frame() %>%
+      magrittr::set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
+      magrittr::inset("effect", value = "Y enrichment") %>% magrittr::set_rownames(ids.neg)
+    xenr <- sapply(l[[2]], function(cc){
+      c(nrow(cc), min(cc[,"col"]), max(cc[,"col"]), min(cc[,"row"]), max(cc[,"row"]))
+    }) %>% t() %>% as.data.frame() %>%
+      magrittr::set_colnames(c("n.cells","start.x","end.x","start.y","end.y")) %>%
+      magrittr::inset("effect", value = "X enrichment") %>% magrittr::set_rownames(ids.pos)
+    xenr[c("start.x","end.x","start.y","end.y")] <- xenr[c("start.y","end.y","start.x","end.x")]
     # get list with connected components
     res.cc <- c(magrittr::set_names(l[[1]], ids.neg), magrittr::set_names(l[[2]], ids.pos))
-    list(res.df, res.cc) %>%
+    list(rbind(yenr, xenr), res.cc) %>%
       magrittr::set_names(c("interacting.regions", "connected.components"))
   }) %>% magrittr::set_names(names(maps.difference))
 }

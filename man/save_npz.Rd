@@ -19,7 +19,7 @@ Saves list with dense matrices to npz compressed file.
 }
 \examples{
 # get sample npz file name
-mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "CopulaHiC", mustWork = TRUE)
+mtx.fname <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
 mtx.dense.sublist <- read_dense(mtx.fname, mtx.names = c("18","19"))
 print(names(mtx.dense.sublist))
 print(typeof(mtx.dense.sublist))
