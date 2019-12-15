@@ -89,34 +89,27 @@ DIADEM package contains sample Hi-C contact map as R built-in dataset.
     * Hi-C contact maps in sparse format
 
         ```r
-	library("DIADEM")
+        library("DIADEM")
         # file name of MSC-HindIII-1 (also IMR90-MboI-1 dataset is available)
-	data(sample_hic_data, package = "DIADEM")
-	msc.df <- sample_hic_data[["MSC-HindIII-1"]]
-	# in order to convert contact map to dense format and save in npz file prepare temporary file
-	mtx.fname.msc <- file.path(tempdir(), "MSC-HindIII-1_40kb-raw.npz")
-	# get chromosome sizes
-	chr.sizes <- sample_hic_data[["chromosome.sizes"]]
-	# convert to dense matrix format
-	l <- lapply(names(msc.df), function(chromosome) sparse2dense(dat2[[chromosome]], N = chr.sizes[[chromosome]]))
-	names(l) <- names(msc.df)
-	# save to npz file
-	save_npz(l, mtx.fname.msc)
-
-        mtx.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
-        # file name of IMR90-MboI-1_40kb-raw_maps
-        mtx.fname.imr90 <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
-        # load data
-        maps.msc <- read_npz(mtx.fname.msc)
-        maps.imr90 <- read_npz(mtx.fname.msc)
+        data(sample_hic_data, package = "DIADEM")
+        msc.df <- sample_hic_data[["MSC-HindIII-1"]]
+        # in order to convert contact map to dense format and save in npz file prepare temporary file
+        mtx.fname.msc <- file.path(tempdir(), "MSC-HindIII-1_40kb-raw.npz")
+        # get chromosome sizes
+        chr.sizes <- sample_hic_data[["chromosome.sizes"]]
+        # convert to dense matrix format
+        l <- lapply(names(msc.df), function(chromosome) sparse2dense(dat2[[chromosome]], N = chr.sizes[[chromosome]]))
+        names(l) <- names(msc.df)
+        # save to npz file
+        save_npz(l, mtx.fname.msc)
         ```
 
     * Reading Hi-C matrices from npz file
 
         ```r
-	# given file name from previous example one can read matrices in npz format as follows
-	sparse.msc <- read_npz(mtx.fname.msc)
-	# or in dense format
-	dense.msc <- read_npz(mtx.fname.msc, sparse.format = FALSE)
+        # given file name from previous example one can read matrices in npz format as follows
+        sparse.msc <- read_npz(mtx.fname.msc)
+        # or in dense format
+        dense.msc <- read_npz(mtx.fname.msc, sparse.format = FALSE)
         ```
 
