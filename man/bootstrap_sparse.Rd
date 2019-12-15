@@ -4,8 +4,7 @@
 \alias{bootstrap_sparse}
 \title{Bootstraps interactions from contact map given in sparse format.}
 \usage{
-bootstrap_sparse(sparse.mtx, ratio = c(0.5, 0.5),
-  with.replacement = FALSE)
+bootstrap_sparse(sparse.mtx, ratio = c(0.5, 0.5), with.replacement = FALSE)
 }
 \arguments{
 \item{sparse.mtx}{data.frame Hi-C contact map in sparse format with mandatory columns i, j, val}

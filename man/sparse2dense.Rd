@@ -4,8 +4,12 @@
 \alias{sparse2dense}
 \title{Converts sparse matrix to dense matrix.}
 \usage{
-sparse2dense(sparse.as.df, N = NULL, balancing = TRUE,
-  missing.cells.na = FALSE)
+sparse2dense(
+  sparse.as.df,
+  N = NULL,
+  balancing = TRUE,
+  missing.cells.na = FALSE
+)
 }
 \arguments{
 \item{sparse.as.df}{data.frame with sparse matrix containing 3 columns: i, j, val}

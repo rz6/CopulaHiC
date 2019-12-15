@@ -4,8 +4,12 @@
 \alias{restore_unmappable_mtx}
 \title{Restores unmappable regions (all zeros columns and rows) in dense matrix.}
 \usage{
-restore_unmappable_mtx(dense.mtx.mappable, idx.rows, idx.cols = NULL,
-  empty.elem = NA)
+restore_unmappable_mtx(
+  dense.mtx.mappable,
+  idx.rows,
+  idx.cols = NULL,
+  empty.elem = NA
+)
 }
 \arguments{
 \item{dense.mtx.mappable}{numeric matrix}

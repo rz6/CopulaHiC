@@ -59,15 +59,17 @@ Two ways of installation are possible (both require R package [devtools](https:/
 1. from github repository:
 
     ```r
-    devtools::install_github("rz6/DIADEM")
+    devtools::install_github("rz6/DIADEM", args="--recursive")
     ```
 
-2. from source: clone repository - by default to directory: diadem, cd to directory containing cloned repo, open R and run:
+2. from source: clone (:warning: NOTE: it must be cloned with --recursive flag, i.e.: `git clone --recursive https://github.com/rz6/DIADEM.git`) repository - by default to directory: diadem, cd to directory containing cloned repo, open R and run:
  
     ```r
     devtools::install("diadem")
     ```
     
+:warning: This repository contains submodule, which must be cloned as well for package to compile. Therefore this repository MUST be cloned with --recursive flag.
+
 ## Usage ##
 -----------
 
@@ -80,14 +82,27 @@ getNamespaceExports("DIADEM")
 
 #### Sample data ####
 
-DIADEM package contains sample data of Hi-C contact maps and TADs. Both of them are in 2 formats:  
+DIADEM package contains sample Hi-C contact map as R built-in dataset.
 
-1. Numpy npz file (Hi-C maps) and csv file (TADs) - to access it run:
+1. It can be accessed as shown below:
 
-    * Hi-C contact maps npz files
+    * Hi-C contact maps in sparse format
 
         ```r
-        # file name of MSC-HindIII-1_40kb-raw_maps
+	library("DIADEM")
+        # file name of MSC-HindIII-1 (also IMR90-MboI-1 dataset is available)
+	data(sample_hic_data, package = "DIADEM")
+	msc.df <- sample_hic_data[["MSC-HindIII-1"]]
+	# in order to convert contact map to dense format and save in npz file prepare temporary file
+	mtx.fname.msc <- file.path(tempdir(), "MSC-HindIII-1_40kb-raw.npz")
+	# get chromosome sizes
+	chr.sizes <- sample_hic_data[["chromosome.sizes"]]
+	# convert to dense matrix format
+	l <- lapply(names(msc.df), function(chromosome) sparse2dense(dat2[[chromosome]], N = chr.sizes[[chromosome]]))
+	names(l) <- names(msc.df)
+	# save to npz file
+	save_npz(l, mtx.fname.msc)
+
         mtx.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
         # file name of IMR90-MboI-1_40kb-raw_maps
         mtx.fname.imr90 <- system.file("extdata", "IMR90-MboI-1_40kb-raw.npz", package = "DIADEM", mustWork = TRUE)
@@ -96,35 +111,12 @@ DIADEM package contains sample data of Hi-C contact maps and TADs. Both of them 
         maps.imr90 <- read_npz(mtx.fname.msc)
         ```
 
-    * TADs csv files
+    * Reading Hi-C matrices from npz file
 
         ```r
-        # file name of MSC-HindIII-1_40kb-raw_tads
-        tads.fname.msc <- system.file("extdata", "MSC-HindIII-1_40kb-raw.tadIS", package = "DIADEM", mustWork = TRUE)
-        # load data
-        tads.msc <- read.csv(tads.fname.msc)
-        ```
-
-2. list with Hi-C contact maps and TADs available in package environment:
-
-    * Hi-C contact maps
-
-        ```r
-        # list available Hi-C maps
-        print(names(DIADEM::sample_hic_maps))
-        # get one
-        map.imr90 <- DIADEM::sample_hic_maps[["IMR90-MboI-1_40kb-raw"]]
-        print(names(map.imr90))
-        print(head(map.imr90[["18"]]))
-        ```
-
-    * TADs
-
-        ```r
-        # list available TADs
-        print(names(DIADEM::sample_tads))
-        # get one
-        tads.imr90 <- DIADEM::sample_tads[["IMR90-MboI-1_40kb-raw"]]
-        print(head(tads.imr90))
+	# given file name from previous example one can read matrices in npz format as follows
+	sparse.msc <- read_npz(mtx.fname.msc)
+	# or in dense format
+	dense.msc <- read_npz(mtx.fname.msc, sparse.format = FALSE)
         ```
 

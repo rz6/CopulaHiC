@@ -8,18 +8,16 @@
 }
 \arguments{
 \item{hic.glm}{object of class HiCglm}
-
-\item{marginal.distr}{character wither fit or obs; if fit then fitted gamma distribution for X and Y is used to convert them to U and V respectively}
 }
 \value{
 list of data frames corresponding to Hi-C contact maps; each data frame contain columns: i, j, name, val.x, val.y, pvalue.x, qvalue.x, pvalue.y, qvalue.y where suffix indicates predictor variable, i.e. pvalue.x indicates E[Y | X] model, so resulting significance means enrichment of Y w.r.t. X
 }
 \description{
-Given HiCglm object calculates enrichment p-values of Y | X or X | Y w.r.t. background models (separate for every diagonal, see \code{\link{HiCglm} for details}).
+Given HiCglm object calculates enrichment p-values of Y | X or X | Y w.r.t. background models (separate for every diagonal (pool), see \code{\link{HiCglm} for details}).
 }
 \examples{
 
 }
 \seealso{
-\code{\link{HiCglm}} on how to construct HiCglm, \code{\link{maps_difference_diagonal}} and \code{\link{significance}} on how p-values are calculated
+\code{\link{HiCglm}} on how to construct HiCglm, \code{\link{significance}} on how p-values are calculated
 }

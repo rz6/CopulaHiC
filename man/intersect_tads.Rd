@@ -26,5 +26,5 @@ print(tads.intersection)
 
 }
 \seealso{
-\code{\link{intervals::Intervals}}, \code{\link{intervals::interval_intersection}} for functions used to find intersection between 2 sets of intervals
+\code{\link[intervals]{Intervals}}, \code{\link[intervals]{interval_intersection}} for functions used to find intersection between 2 sets of intervals
 }

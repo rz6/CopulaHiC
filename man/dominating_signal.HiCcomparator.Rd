@@ -4,11 +4,12 @@
 \alias{dominating_signal.HiCcomparator}
 \title{Calculates coverage or decay of Hi-C maps.}
 \usage{
-\method{dominating_signal}{HiCcomparator}(hic.comparator,
-  which.signal = c("coverage", "decay")[1])
+\method{dominating_signal}{HiCcomparator}(hic.comparator, which.signal = c("coverage", "decay")[1])
 }
 \arguments{
 \item{hic.comparator}{object of type HiCcomparator}
+
+\item{which.signal}{character either coverage or decay, which signal to calculate}
 }
 \value{
 dataframe with following columns: (i, sum.contacts, mean.contacts, sd.contacts, name, dataset), which can be used to conveniently visualise coverages or decays (see examples)

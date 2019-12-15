@@ -4,8 +4,13 @@
 \alias{map2tads}
 \title{Determines TAD boundaries using Insulation Score.}
 \usage{
-map2tads(dense.mtx, resolution = 40000, window.bp = 500 * 1000,
-  delta.bp = 100 * 1000, without_unmappable = TRUE)
+map2tads(
+  dense.mtx,
+  resolution = 40000,
+  window.bp = 500 * 1000,
+  delta.bp = 100 * 1000,
+  without_unmappable = TRUE
+)
 }
 \arguments{
 \item{dense.mtx}{numeric matrix in dense format representing Hi-C contact map}

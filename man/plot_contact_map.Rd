@@ -4,9 +4,15 @@
 \alias{plot_contact_map}
 \title{Plots simple contact map or fold-change contact map with log2 scale.}
 \usage{
-plot_contact_map(contact.map, fc = FALSE, breaks = 100,
-  zeros.na = TRUE, colors.pal = c("white", "red"), useRaster = TRUE,
-  ...)
+plot_contact_map(
+  contact.map,
+  fc = FALSE,
+  breaks = 100,
+  zeros.na = TRUE,
+  colors.pal = c("white", "red"),
+  useRaster = TRUE,
+  ...
+)
 }
 \arguments{
 \item{contact.map}{numeric matrix (with non-negative entries) to be plotted}
@@ -40,5 +46,5 @@ plot_contact_map(fc.mtx, fc = TRUE, colors.pal = c("blue","white","red"))
 
 }
 \seealso{
-\code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
+\code{\link[DIADEM]{image_plot_na}} for function handling heatmap plotting
 }

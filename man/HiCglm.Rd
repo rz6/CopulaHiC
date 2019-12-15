@@ -4,19 +4,36 @@
 \alias{HiCglm}
 \title{An S3 object to represent differential GLM Hi-C model.}
 \usage{
-HiCglm(hic.comparator, diagonals = 0.1, remove.outliers = TRUE,
-  outlier.weight = 0, link = c("log", "sqrt")[1])
+HiCglm(
+  hic.comparator,
+  diag.frac = 0.5,
+  alpha = 0.05,
+  robust.nb = TRUE,
+  remove.outliers = TRUE,
+  outlier.weight = 0,
+  ncores = 1,
+  max.nobs = 20000,
+  nrep = 10
+)
 }
 \arguments{
 \item{hic.comparator}{object of type HiCcomparator}
 
-\item{diagonals}{fraction or numeric vector or character "all" which diagonals to use to fit models, by default fraction of chromsome length is used to indicate number of diagonals.}
+\item{diag.frac}{fraction of diagonals to use to fit models, by default fraction of chromsome length is used to indicate number of diagonals.}
 
-\item{remove.outliers}{logical if true try to remove outliers before fitting proper model (NB regression) using robust regression (IRLS) with bisquare weight function}
+\item{alpha}{significance (p-value) threshold to discard diagonals with insignificant Pearson correlation coefficient between X (contacts from contact map 1) and Y (corresponding contacts from contact map 2).}
 
-\item{outlier.weight}{numeric weight threshold to remove outliers}
+\item{robust.nb}{logical whether to use robust Negative Binomial regression as main model (see details), true by default}
 
-\item{link}{character either log or sqrt - link function for NB regression}
+\item{remove.outliers}{logical only relevant if \code{robust.nb} is set to false - if true try to remove outliers (potential Differential Interactions) before model fitting (NB regression) using robust regression (IRLS) with bisquare weight function}
+
+\item{outlier.weight}{numeric weight threshold to remove outliers, 0 by default}
+
+\item{ncores}{numeric number of cores for parallel processing to speed up computations}
+
+\item{max.nobs}{numeric maximum number of observations to be used for robust NB regression model estimation (see \code{\link{constructGLM}})}
+
+\item{nrep}{number of repetitions to average parameter estimates during robust NB regression model estimation on large sample sizes (see \code{\link{constructGLM}})}
 }
 \value{
 S3 object of class HiCglm
@@ -25,19 +42,30 @@ S3 object of class HiCglm
 Models diagonal-wise dependencies between Hi-C data sets with GLM. Model is constructed as follows:
 \itemize{
   \item{}{merge maps1 with maps2}
-  \item{}{for each diagonal in diagonals}
+  \item{}{for each diagonal in diagonal pools}
   \itemize{
     \item{}{take all points from this diagonal, such that they are non zero in map1 (X) and non zero in map2 (Y)}
-    \item{}{remove outliers using robust regression (recommended)}
-    \item{}{apply transformation to predictor variable (X or Y): log or sqrt depending on link function}
-    \item{}{model response (Y = f(X) or X = f(Y)) using Negative Binomial distribution with appropriate link function}
+    \item{}{remove outliers using robust regression (only performed when \code{robust.nb} is false)}
+    \item{}{model response (Y = f(X) or X = f(Y)) using (robust) Negative Binomial distribution}
   }
 }
-Before fitting the model it's recommended to first inspect correlations between analyzed Hi-C maps before fixing this variable. As the ratio of noise / signal in Hi-C data increases rapidly with decay it's unadvised to use all diagonals for modelling. The number of diagonals to be used will depend on chromosome length, resolution and data quality. As a rule of thumb the number of diagonals should not exceed 0.1 times length of chromosome.
+Before fitting the model it's recommended to first inspect correlations between analyzed Hi-C maps before fixing this variable. As the ratio of noise / signal in Hi-C data increases rapidly with decay it's unadvised to use all diagonals for modelling. The number of diagonals to be used will depend on chromosome length, resolution and data quality. One can retain uncorrelated diagonals (pools) by increasing significance threshold (\code{alpha}) for PCC significance.
+}
+\details{
+When \code{robust.nb} is true, the model  is fitted using robust procedure developed and published by \insertCite{aeberhard2014robust}{DIADEM} - see \code{\link{constructGLM}} function for details.
+
+The main assumption behind \code{HiCglm} is that given 2 Hi-C datasets (even very different cell lines) their diagonal-wise interaction profiles will be correlated, which should manifest in X,Y plots having funnel like shape (see \code{simulate_null} function). In this setting it is further assumed (based on observed X,Y dependencies) that potential Differential Interactions will behave like outliers thereby disobeying the funnel-like pattern. The use of robust Negative Binomial regression  diminishes the influence of outliers on model fitting and allows to capture “uncontaminated” (with no DIs) null model.
 }
 \examples{
+# first create hiccomp (i.e. HiCcomparator object), then
+hicglm <- HiCglm(hiccomp)
 
 }
+\references{
+{
+  \insertRef{aeberhard2014robust}{DIADEM}
+}
+}
 \seealso{
-\code{\link{HiCcomparator}} on how to construct HiCcomparator object and \code{\link{robustreg::robustRegBS}} on how robust regression is performed and outliers selection process
+\code{\link{HiCcomparator}} on how to construct HiCcomparator object and \code{\link{constructGLM}}, \code{\link[robustreg]{robustRegBS}} on how GLM fitting process
 }

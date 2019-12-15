@@ -4,8 +4,17 @@
 \alias{HiCcomparator}
 \title{An S3 class to represent object for Hi-C maps comparisons.}
 \usage{
-HiCcomparator(path1, path2, tads = NULL, mtx.names = "all",
-  which.tads = 4, do.pca = FALSE, zscore = FALSE, props = FALSE)
+HiCcomparator(
+  path1,
+  path2,
+  tads = NULL,
+  mtx.names = "all",
+  which.tads = 4,
+  do.pca = FALSE,
+  agg.diags = TRUE,
+  which.test = c("energy", "KS")[1],
+  exclude.outliers = FALSE
+)
 }
 \arguments{
 \item{path1}{character - path to npz file containing first set of Hi-C maps}
@@ -19,6 +28,12 @@ HiCcomparator(path1, path2, tads = NULL, mtx.names = "all",
 \item{which.tads}{numeric indicating what to do if no TADs are specified: 1 - determine TADs from first set of Hi-C maps, 2 - determine TADs from second set of Hi-C maps, 3 - determine from both sets and then take their intersection, 4 - do not determine TADs}
 
 \item{do.pca}{logical whether to perform PCA for given maps and determine A/B compartments}
+
+\item{agg.diags}{logical whether to perform diagonal pooling (see details), true by default}
+
+\item{which.test}{character either energy statistic based test (default) or KS, which test to perform during diagonals pooling (see details)}
+
+\item{exclude.outliers}{logical see \code{\link{aggregate_diagonals}} for details}
 }
 \value{
 S3 object of class HiCcomparator
@@ -31,6 +46,20 @@ Additionally TAD set may be given to HiCcomparator (as list of data frames, wher
 names match those of Hi-C matrices names). One can also choose to determine TADs based on
 given Hi-C contact maps - only first, only second or determine both and take intersecting
 intervals between them.
+}
+\details{
+If \code{agg.diags} is true then an attempt to pull in diagonals with similar X, Y distribution will be made. The reason for this is to increase the number of observations for model fitting and increase the potential range of diagonals where a model can be fit. The procedure proceeds as follows:
+\enumerate{
+  \item set \code{k} to \code{1} and take diagonal \code{k}
+  \item set \code{l} to \code{k + 1} an take diagonal \code{l}
+  \item test null hypothesis that points X,Y (where coordinate X - number of contacts in cell i,j in contact map 1 and Y - number of contacts in cell i,j in contact map 2) of diagonal \code{l} were sampled from distribution X,Y of diagonal \code{k}
+  \itemize{
+    \item if rejected, i.e. alternative is true: the distribution X,Y of diagonal \code{k} and \code{l} are different then pool in diagonals (\code{k}, ..., \code{l-1}), fix \code{k} = \code{l} and go to step 2
+    \item otherwise fix \code{l} = \code{l + 1} and perform step 3
+  }
+  \item repeat steps 2-3 until all diagonals are examined
+}
+To test the hypothesis of equality between distributions X,Y of diagonals \code{k} and \code{l} energy statistic based test (from package energy) is used. Alternatively a very crude, approximate solution to speed up diagonal aggregation is to calculate the product of X and Y and compare the univariate distributions of products using Kolmogorov Smirnoff test instead using bivariate X,Y distributions. This option is available through setting \code{which.test} parameter to "KS".
 }
 \examples{
 # get path of first sample maps
@@ -47,5 +76,5 @@ plot_pc_vector(hic.comparator$pc1.maps2[["19"]]) # second map
 
 }
 \seealso{
-\code{\link{read_npz}} for reading npz files, \code{\link{do_pca}} on how A/B compartments are determined, \code{\link{map2tads}} how TADs are determined
+\code{\link{read_npz}} for reading npz files, \code{\link{do_pca}} on how A/B compartments are determined, \code{\link{map2tads}} how TADs are determined, \code{\link[energy]{eqdist.etest}} for energy statistic based test
 }

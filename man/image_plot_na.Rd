@@ -4,9 +4,15 @@
 \alias{image_plot_na}
 \title{Wrapper for fields::image.plot function.}
 \usage{
-image_plot_na(z, breaks, col, na.color = "black",
-  neg.inf.color = "gold", pos.inf.color = "darkgreen",
-  colorbar = TRUE, ...)
+image_plot_na(
+  z,
+  breaks,
+  col,
+  na.color = "black",
+  neg.inf.color = "gold",
+  pos.inf.color = "darkgreen",
+  ...
+)
 }
 \arguments{
 \item{z}{numeric matrix to be plotted; may contain -Inf, Inf and NA values}
@@ -21,7 +27,7 @@ image_plot_na(z, breaks, col, na.color = "black",
 
 \item{pos.inf.color}{color for Inf values}
 
-\item{...}{additional arguments passed to \code{\link{fields::image.plot}}}
+\item{...}{additional arguments passed to \code{\link[fields]{image.plot}}}
 }
 \description{
 Allows to mark -Inf, Inf and NA values in heatmaps with different colors. It will automatically detect such values and assign them color.
@@ -50,5 +56,5 @@ colors <- pal(length(breaks) - 1L)
 image_plot_na(mtx, breaks, colors)
 }
 \seealso{
-\code{\link{fields::image.plot}} for function which finally handles heatmap plotting
+\code{\link[fields]{image.plot}} for function which finally handles heatmap plotting
 }
