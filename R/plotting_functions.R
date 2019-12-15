@@ -8,11 +8,11 @@
 #' @param na.color color for NA values
 #' @param neg.inf.color color for -Inf values
 #' @param pos.inf.color color for Inf values
-#' @param ... additional arguments passed to \code{\link{fields::image.plot}}
+#' @param ... additional arguments passed to \code{\link[fields]{image.plot}}
 #'
 #' @return NULL
 #'
-#' @seealso \code{\link{fields::image.plot}} for function which finally handles heatmap plotting
+#' @seealso \code{\link[fields]{image.plot}} for function which finally handles heatmap plotting
 #'
 #' @examples
 #' # matrix of data
@@ -37,8 +37,7 @@
 #' # finally plot matrix
 #' image_plot_na(mtx, breaks, colors)
 image_plot_na <- function(z,  breaks, col, na.color = 'black',
-                          neg.inf.color = "gold", pos.inf.color = "darkgreen",
-                          colorbar = TRUE, ...){
+                          neg.inf.color = "gold", pos.inf.color = "darkgreen", ...){
   zlim <- c(breaks[1], breaks[length(breaks)])
   zstep <- (zlim[2] - zlim[1]) / length(col); # step in the color palette
   range.fraction <- round((zlim[2] - zlim[1]) * 0.05)
@@ -76,11 +75,24 @@ image_plot_na <- function(z,  breaks, col, na.color = 'black',
     cbar.labels <- c(cbar.labels, "Inf")
   }
 
+  params <- list(...)
+  if(!("xlab" %in% names(params))){
+    params["xlab"] <- ""
+  }
+  if(!("ylab" %in% names(params))){
+    params["ylab"] <- ""
+  }
+  params[c("x", "y", "z", "zlim", "col", "breaks")] <- list(seq(1,ncol(z)), seq(1,nrow(z)), z,  zlim, col, breaks)
+  colorbar <- TRUE
+  if("colorbar" %in% names(params)){
+    colorbar <- params[["colorbar"]]
+    params[["colorbar"]] <- NULL
+  }
   if(colorbar){
-    fields::image.plot(x = seq(1,ncol(z)), y = seq(1,nrow(z)), z=z,  zlim=zlim, col=col,breaks = breaks,
-                       axis.args=list(at=cbar.coords, labels=cbar.labels), xlab = "X", ylab = "Y", ...)
+    params[["axis.args"]] <- list(at = cbar.coords, labels = cbar.labels)
+    do.call(fields::image.plot, params)
   } else {
-    image(x = seq(1,ncol(z)), y = seq(1,nrow(z)), z=z,  zlim=zlim, col=col,breaks = breaks, ...)
+    do.call(image, params)
   }
 }
 
@@ -95,7 +107,7 @@ image_plot_na <- function(z,  breaks, col, na.color = 'black',
 #'
 #' @return NULL
 #'
-#' @seealso \code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
+#' @seealso \code{\link[DIADEM]{image_plot_na}} for function handling heatmap plotting
 #'
 #' @examples
 #' # get sample contact map (MSC replicate 1) for chromosome 18
@@ -159,7 +171,7 @@ plot_contact_map <- function(contact.map, fc = FALSE, breaks = 100, zeros.na = T
 #'
 #' @return NULL
 #'
-#' @seealso \code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
+#' @seealso \code{\link[DIADEM]{image_plot_na}} for function handling heatmap plotting
 #'
 #' @examples
 #' # get sample contact map (MSC replicate 1) for chromosome 18
@@ -307,6 +319,7 @@ plot_regions <- function(regions, pal.colors = NULL, lty = 1, lwd = 0.5){
 #' @param xlim numeric 2-element vector o x limits
 #' @param ylim numeric 2-element vector o y limits
 #' @param which.map character string indicating if contact map or diff map should be plotted
+#' @param mar numeric vector of length 4 specifying margins
 #' @param args.regions named list of arguments passed to \code{\link{plot_regions}} function, if NULL then don not plot regions
 #'
 #' @return NULL
@@ -326,10 +339,10 @@ plot_regions <- function(regions, pal.colors = NULL, lty = 1, lwd = 0.5){
 #' plot_with_inset(list(dense), c(500,800), c(500,800), args.regions = list(tads))
 #'
 #' @export
-plot_with_inset <- function(args.map, xlim, ylim,which.map = c("contact.map","diff.map")[1],
-                            args.regions = NULL){
+plot_with_inset <- function(args.map, xlim, ylim, which.map = c("contact.map","diff.map")[1],
+                            mar = c(1, 2, 1, 0.1), args.regions = NULL){
   # adjust margins for inset
-  par(mar = c(1, 2, 1, 0.1))
+  par(mar = mar)
   # create layout: inset on the left hand side, full size map on the right hand side
   layout(matrix(c(1,2,3,3), ncol = 2, byrow = FALSE),
          widths = c(1,2), heights = c(2,2))
@@ -358,54 +371,4 @@ plot_with_inset <- function(args.map, xlim, ylim,which.map = c("contact.map","di
   #  # plot regions
   #  do.call(plot_regions, args.regions)
   #}
-}
-
-#' Creates expected vs observed plot for given Hi-C GLM
-#'
-#' Creates list of lists wtih plots. Each list contains a 2 element list for given model (usually chromosome), where 2 entries are: model Y | X and X | Y
-#'
-#' @export
-plotHiCglm <- function(hic.glm, diagonals = "all", N = 30, ncol = NULL){
-  lapply(names(hic.glm$model), function(n){
-    model <- hic.glm$model[[n]]
-    if(diagonals[1] == "all"){
-      diagonals <- names(model)
-    }
-    lapply(c("x","y"), function(which.model){
-      lapply(diagonals, function(k){
-        l <- model[[k]]
-        dataset <- l[["data"]]
-        mdl <- l[[paste0("model.", which.model)]]
-        predictor <- paste0("val.transformed.", which.model)
-        mu <- predict(mdl, newdata = data.frame(predictor = dataset[,predictor]))
-        predictor.mu <- cbind(dataset[,predictor], mu)
-        if(mdl[["family"]]$link == "log"){
-          inv.link <- function(v) exp(v)
-        }
-        if(mdl[["family"]]$link == "sqrt"){
-          inv.link <- function(v) v ** 2
-        }
-        lapply(1:nrow(predictor.mu), function(i){
-          if(mdl[["family"]]$family == "poisson"){
-            r <- rpois(N, inv.link(predictor.mu[i,2]))
-          } else {
-            r <- MASS::rnegbin(N, inv.link(predictor.mu[i,2]), theta = mdl$theta)
-          }
-          data.frame(predictor = predictor.mu[i,1], response = r, diagonal = as.numeric(k), type = "expected")
-        }) %>% do.call("rbind", .) -> expected
-        cn <- c(predictor, paste0("val.", setdiff(c("x", "y"), which.model)), "diagonal")
-        rbind(
-          expected,
-          magrittr::inset(magrittr::set_colnames(dataset[cn], c("predictor","response","diagonal")), "type", value = "observed")
-        )
-      }) %>% do.call("rbind", .) -> exp.obs
-      if(is.null(ncol)){
-        ncol <- ceiling(length(diagonals) ^ 0.5)
-      }
-      ggplot2::ggplot(exp.obs, ggplot2::aes(x = predictor, y = response, color = type)) +
-        ggplot2::geom_point(size = 0.2) +
-        ggplot2::facet_wrap(~ diagonal, scales = "free", ncol = ncol) +
-        ggplot2::theme(legend.position = "bottom")
-    }) %>% magrittr::set_names(c("Y | X","X | Y"))
-  }) %>% magrittr::set_names(names(hic.glm$model))
 }

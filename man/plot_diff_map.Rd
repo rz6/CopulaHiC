@@ -4,10 +4,19 @@
 \alias{plot_diff_map}
 \title{Plots differential map.}
 \usage{
-plot_diff_map(mtx.dense, zeros.na = TRUE, breaks = 10,
-  colors.pal = c("blue", "white", "red"), color.range = NULL,
-  sqrt.transform = FALSE, na.color = "black", neg.inf.color = "gold",
-  pos.inf.color = "darkgreen", useRaster = TRUE, ...)
+plot_diff_map(
+  mtx.dense,
+  zeros.na = TRUE,
+  breaks = 10,
+  colors.pal = c("blue", "white", "red"),
+  color.range = NULL,
+  sqrt.transform = FALSE,
+  na.color = "black",
+  neg.inf.color = "gold",
+  pos.inf.color = "darkgreen",
+  useRaster = TRUE,
+  ...
+)
 }
 \arguments{
 \item{mtx.dense}{numeric matrix with positive and negative entries; if matrix does not contain any negative values use \code{\link{plot_contact_map}} function}
@@ -43,5 +52,5 @@ plot_diff_map(dense, sqrt.transform = TRUE)
 
 }
 \seealso{
-\code{\link{DIADEM::iamge_plot_na}} for function handling heatmap plotting
+\code{\link[DIADEM]{image_plot_na}} for function handling heatmap plotting
 }

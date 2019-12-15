@@ -1,6 +1,6 @@
 Package: DIADEM
 Type: Package
-Title: Normalization avoiding modelling and detection of differential interactions in Hi-C data via GLM.
+Title: Hi-C differential analysis via dependency modelling of chromatin interactions with generalized linear models
 Version: 0.1.0
 Author: Rafal Zaborowski
 Maintainer: Rafal Zaborowski <r.zaborowski@mimuw.edu.pl>
@@ -19,12 +19,18 @@ Imports:
 	latex2exp,
 	intervals,
 	robustreg,
-	MASS
+	robustbase,
+	MASS,
+	energy,
+	AER,
+	Rdpack
 Suggests:
 	ggplot2,
 	reshape2,
 	gridExtra,
     	knitr,
-    	rmarkdown
-RoxygenNote: 6.1.1
+    	rmarkdown,
+	bookdown
+RdMacros: Rdpack
+RoxygenNote: 7.0.0
 VignetteBuilder: knitr

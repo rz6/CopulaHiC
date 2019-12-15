@@ -4,9 +4,13 @@
 \alias{hicdiff2mtx}
 \title{Converts significance maps to dense matrices.}
 \usage{
-hicdiff2mtx(hicdiff.list, maps.dims, val.column = c("qvalue",
-  "pvalue")[1], neg.log = TRUE, which.enrichment = c("both", "x",
-  "y")[1])
+hicdiff2mtx(
+  hicdiff.list,
+  maps.dims,
+  val.column = c("qvalue", "pvalue")[1],
+  neg.log = TRUE,
+  which.enrichment = c("both", "x", "y")[1]
+)
 }
 \arguments{
 \item{hicdiff.list}{list of data frames, output from \code{\link{hicdiff}} function}

@@ -4,9 +4,15 @@
 \alias{bootstrap_dataset}
 \title{Bootstraps interactions from given Hi-C dataset.}
 \usage{
-bootstrap_dataset(path, ratio = list(c(0.5, 0.5)),
-  with.replacement = FALSE, N = 3, mtx.names = "all", n.cores = 1,
-  save.path = NULL)
+bootstrap_dataset(
+  path,
+  ratio = list(c(0.5, 0.5)),
+  with.replacement = FALSE,
+  N = 3,
+  mtx.names = "all",
+  n.cores = 1,
+  save.path = NULL
+)
 }
 \arguments{
 \item{path}{character path to Hi-C dataset in npz format}

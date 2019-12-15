@@ -27,5 +27,5 @@ print(left.max(v2))
 print(left.max(v3))
 }
 \seealso{
-\code{\link{DIADEM::local.min}}, \code{\link{DIADEM::local.max}} for finding local minma and maxima in vector v
+\code{\link[DIADEM]{local.min}}, \code{\link[DIADEM]{local.max}} for finding local minma and maxima in vector v
 }

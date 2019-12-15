@@ -1,0 +1,3 @@
+[submodule "submodules/glmrob.nb"]
+	path = submodules/glmrob.nb
+	url = https://github.com/williamaeberhard/glmrob.nb

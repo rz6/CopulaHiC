@@ -4,8 +4,14 @@
 \alias{plot_with_inset}
 \title{Plots contact map or diff map with inset.}
 \usage{
-plot_with_inset(args.map, xlim, ylim, which.map = c("contact.map",
-  "diff.map")[1], args.regions = NULL)
+plot_with_inset(
+  args.map,
+  xlim,
+  ylim,
+  which.map = c("contact.map", "diff.map")[1],
+  mar = c(1, 2, 1, 0.1),
+  args.regions = NULL
+)
 }
 \arguments{
 \item{args.map}{named list of arguments for map plotting function for type of args see \code{\link{plot_contact_map}} and \code{\link{plot_diff_map}}}
@@ -15,6 +21,8 @@ plot_with_inset(args.map, xlim, ylim, which.map = c("contact.map",
 \item{ylim}{numeric 2-element vector o y limits}
 
 \item{which.map}{character string indicating if contact map or diff map should be plotted}
+
+\item{mar}{numeric vector of length 4 specifying margins}
 
 \item{args.regions}{named list of arguments passed to \code{\link{plot_regions}} function, if NULL then don not plot regions}
 }

@@ -4,10 +4,18 @@
 \alias{decay_correlation.HiCcomparator}
 \title{Calculates correlations between diagonals.}
 \usage{
-\method{decay_correlation}{HiCcomparator}(hic.comparator)
+\method{decay_correlation}{HiCcomparator}(
+  hic.comparator,
+  which.cors = c("pearson", "spearman", "kendall")[1:2],
+  pooled = TRUE
+)
 }
 \arguments{
 \item{hic.comparator}{object of type HiCcomparator}
+
+\item{which.cors}{character indicating which correlation measures to calculate, available choices are: pearson, spearman and kendall}
+
+\item{pooled}{logical if true then calculates correlations over pools of diagonals, otherwise uses single diagonals}
 }
 \value{
 dataframe with following columns: diagonal, pcc, pearson.pval, rho, spearman.pval, tau, kendall.pval, name which can be used to conveniently visualise dependancy between 2 Hi-C maps being compared (see examples)

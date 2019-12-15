@@ -4,10 +4,15 @@
 \alias{differential_interactions.HiCglm}
 \title{Finds significantly interacting rectangle-like regions.}
 \usage{
-\method{differential_interactions}{HiCglm}(hic.glm, sig.map = NULL,
-  plot.models = TRUE, pval = 0.05, sig.thr.selection = c(1, 2, 3)[1],
-  which.significance = c("qvalue", "pvalue")[1], cc.direction = c(4,
-  8)[1])
+\method{differential_interactions}{HiCglm}(
+  hic.glm,
+  sig.map = NULL,
+  plot.models = TRUE,
+  pval = 0.05,
+  sig.thr.selection = c(1, 2, 3)[1],
+  which.significance = c("qvalue", "pvalue")[1],
+  cc.direction = c(4, 8)[1]
+)
 }
 \arguments{
 \item{hic.glm}{object of class HiCglm}
@@ -44,5 +49,5 @@ When using option 1 and 3 its recommended to plot the fit (enabled by default). 
 
 }
 \seealso{
-\code{\link{best_fit_bilinear}} for fitting bilinear model, \code{\link{raster::raster}} and \code{\link{raster::clump}} for connected components search
+\code{\link{best_fit_bilinear}} for fitting bilinear model, \code{\link[raster]{raster}} and \code{\link[raster]{clump}} for connected components search
 }

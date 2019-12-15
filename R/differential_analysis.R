@@ -14,10 +14,26 @@
 #' @param mtx.names character vector with subset of Hi-C maps names to be selected for analysis, by default all matrices are used
 #' @param which.tads numeric indicating what to do if no TADs are specified: 1 - determine TADs from first set of Hi-C maps, 2 - determine TADs from second set of Hi-C maps, 3 - determine from both sets and then take their intersection, 4 - do not determine TADs
 #' @param do.pca logical whether to perform PCA for given maps and determine A/B compartments
+#' @param agg.diags logical whether to perform diagonal pooling (see details), true by default
+#' @param which.test character either energy statistic based test (default) or KS, which test to perform during diagonals pooling (see details)
+#' @param exclude.outliers logical see \code{\link{aggregate_diagonals}} for details
 #'
 #' @return S3 object of class HiCcomparator
 #'
-#' @seealso \code{\link{read_npz}} for reading npz files, \code{\link{do_pca}} on how A/B compartments are determined, \code{\link{map2tads}} how TADs are determined
+#' @details If \code{agg.diags} is true then an attempt to pull in diagonals with similar X, Y distribution will be made. The reason for this is to increase the number of observations for model fitting and increase the potential range of diagonals where a model can be fit. The procedure proceeds as follows:
+#' \enumerate{
+#'   \item set \code{k} to \code{1} and take diagonal \code{k}
+#'   \item set \code{l} to \code{k + 1} an take diagonal \code{l}
+#'   \item test null hypothesis that points X,Y (where coordinate X - number of contacts in cell i,j in contact map 1 and Y - number of contacts in cell i,j in contact map 2) of diagonal \code{l} were sampled from distribution X,Y of diagonal \code{k}
+#'   \itemize{
+#'     \item if rejected, i.e. alternative is true: the distribution X,Y of diagonal \code{k} and \code{l} are different then pool in diagonals (\code{k}, ..., \code{l-1}), fix \code{k} = \code{l} and go to step 2
+#'     \item otherwise fix \code{l} = \code{l + 1} and perform step 3
+#'   }
+#'   \item repeat steps 2-3 until all diagonals are examined
+#' }
+#' To test the hypothesis of equality between distributions X,Y of diagonals \code{k} and \code{l} energy statistic based test (from package energy) is used. Alternatively a very crude, approximate solution to speed up diagonal aggregation is to calculate the product of X and Y and compare the univariate distributions of products using Kolmogorov Smirnoff test instead using bivariate X,Y distributions. This option is available through setting \code{which.test} parameter to "KS".
+#'
+#' @seealso \code{\link{read_npz}} for reading npz files, \code{\link{do_pca}} on how A/B compartments are determined, \code{\link{map2tads}} how TADs are determined, \code{\link[energy]{eqdist.etest}} for energy statistic based test
 #'
 #' @examples
 #' # get path of first sample maps
@@ -34,7 +50,8 @@
 #'
 #' @export
 HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.tads = 4,
-                          do.pca = FALSE, zscore = FALSE, props = FALSE){
+                          do.pca = FALSE, agg.diags = TRUE, which.test = c("energy","KS")[1],
+                          exclude.outliers = FALSE){
   # read HiC contact maps
   maps1 <- read_npz(path1, mtx.names = mtx.names)
   maps2 <- read_npz(path2, mtx.names = mtx.names)
@@ -52,21 +69,12 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
   N2 <- lapply(names(maps2), function(x){
     sapply(split(maps2[[x]], maps2[[x]]$diagonal), function(df) sum(df$val))
   }) %>% magrittr::set_names(names(maps2))
-  if(props){
-    lapply(names(maps1), function(x) proportions(maps1[[x]])) %>%
-      magrittr::set_names(names(maps1)) -> maps1
-    lapply(names(maps2), function(x) proportions(maps2[[x]])) %>%
-      magrittr::set_names(names(maps2)) -> maps2
-  }
-  if(zscore){
-    # zscore every diagonal
-    lapply(names(maps1), function(x){
-      interactions2zscores(maps1[[x]])
-    }) %>% magrittr::set_names(names(maps1)) -> maps1
-    lapply(names(maps2), function(x){
-      interactions2zscores(maps2[[x]])
-    }) %>% magrittr::set_names(names(maps2)) -> maps2
-  }
+  # aggregate diagonals
+  nms <- intersect(names(maps1), names(maps2))
+  dpool <- lapply(nms, function(n){
+    aggregate_diagonals(maps1[[n]], maps2[[n]], agg.diags = agg.diags,
+                        which.test = which.test, exclude.outliers = exclude.outliers)
+  }) %>% magrittr::set_names(nms)
   # get datasets names
   data.names <- c(sub('\\..*$','', basename(path1)), sub('\\..*$','', basename(path2)))
   # get sizes of each chromosome
@@ -117,7 +125,6 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
         intersect_tads(t1, t2)
       })
     } else {
-      # leave TADs as NULL which means use DP in detection of differential regions
       domains <- NULL
     }
   } else {
@@ -129,8 +136,8 @@ HiCcomparator <- function(path1, path2, tads = NULL, mtx.names = "all", which.ta
   }
 
   structure(
-    list(maps1, maps2, maps1.pc1, maps2.pc1, domains, data.names, sizes, N1, N2) %>%
-      magrittr::set_names(c("maps1", "maps2", "pc1.maps1", "pc1.maps2", "tads", "data.names", "maps.dims", "N1", "N2")),
+    list(maps1, maps2, maps1.pc1, maps2.pc1, domains, data.names, sizes, N1, N2, dpool) %>%
+      magrittr::set_names(c("maps1", "maps2", "pc1.maps1", "pc1.maps2", "tads", "data.names", "maps.dims", "N1", "N2", "diags.pool")),
     class = "HiCcomparator"
   )
 }
@@ -191,6 +198,7 @@ dominating_signal <- function(x, ...) UseMethod("dominating_signal", x)
 #' Computes coverages or decays of every Hi-C maps in both data sets of given HiCcomparator object. Coverage is defined as sum of contacts on given bin. Decay is sum or mean of contacts for every diagonal.
 #'
 #' @param hic.comparator object of type HiCcomparator
+#' @param which.signal character either coverage or decay, which signal to calculate
 #'
 #' @return dataframe with following columns: (i, sum.contacts, mean.contacts, sd.contacts, name, dataset), which can be used to conveniently visualise coverages or decays (see examples)
 #'
@@ -241,6 +249,8 @@ decay_correlation <- function(x, ...) UseMethod("decay_correlation", x)
 #' Computes correlations (Pearson, Spearman, Kendall) and significances of corresponding diagonals between 2 Hi-C maps of HiCcomparator object.
 #'
 #' @param hic.comparator object of type HiCcomparator
+#' @param which.cors character indicating which correlation measures to calculate, available choices are: pearson, spearman and kendall
+#' @param pooled logical if true then calculates correlations over pools of diagonals, otherwise uses single diagonals
 #'
 #' @return dataframe with following columns: diagonal, pcc, pearson.pval, rho, spearman.pval, tau, kendall.pval, name which can be used to conveniently visualise dependancy between 2 Hi-C maps being compared (see examples)
 #'
@@ -261,63 +271,33 @@ decay_correlation <- function(x, ...) UseMethod("decay_correlation", x)
 #'  theme(legend.position = "bottom")
 #'
 #' @export
-decay_correlation.HiCcomparator <- function(hic.comparator){
+decay_correlation.HiCcomparator <- function(hic.comparator,
+                                            which.cors = c("pearson","spearman","kendall")[1:2],
+                                            pooled = TRUE){
+  stopifnot(all(which.cors %in% c("pearson","spearman","kendall")))
+  l <- magrittr::set_names(c("pcc","rho","tau"), c("pearson","spearman","kendall"))
+  cn <- rep(NA, 2 * length(which.cors))
+  cn[seq(1, length(cn),2)] <- l[which.cors]
+  cn[seq(2, length(cn),2)] <- paste(which.cors, "pval", sep = ".")
   merged <- merge(hic.comparator)
   lapply(names(merged), function(n){
-    merged.n <- merged[[n]]
-    merged.n.by.diagonal <- split(merged.n, merged.n$diagonal)
+    merged.n <- base::merge(merged[[n]], hic.comparator$diags.pool[[n]], by = c("diagonal"))
+    if(pooled)
+      merged.n.by.diagonal <- split(merged.n, merged.n$dpool)
+    else
+      merged.n.by.diagonal <- split(merged.n, merged.n$diagonal)
     sapply(names(merged.n.by.diagonal), function(d){
       df <- merged.n.by.diagonal[[d]]
-      if(nrow(df) < 5){
-        # if there are less than 5 observations there is no point in calculating correlation
-        cors <- rep(NA, 6)
-      } else {
-        cors <- sapply(c("pearson","spearman","kendall"), function(x){
-          c(
-            cor(df$val.x, df$val.y, method = x),
-            cor.test(df$val.x, df$val.y, method = x, alternative = "two.sided")$p.value
-          )
-        })
-      }
-      c(as.numeric(d), as.vector(cors))
+      sapply(which.cors, function(x){
+        coefficient <- ifelse(nrow(df) < 5, NA, cor(df$val.x, df$val.y, method = x))
+        pval <- ifelse(nrow(df) < 5, NA, cor.test(df$val.x, df$val.y,
+                                                  method = x, alternative = "two.sided")$p.value)
+        c(coefficient, pval)
+      }) %>% c(as.numeric(d), .)
     }) %>% t() %>% as.data.frame() %>%
-      magrittr::set_colnames(c("diagonal","pcc","pearson.pval","rho","spearman.pval","tau","kendall.pval")) %>%
+      magrittr::set_colnames(c("diagonal",cn)) %>%
       magrittr::inset("name", value = n)
   }) %>% do.call("rbind",.)
-}
-
-#' Constructs GLM to model per-diagonal Hi-C contact dependancy
-#'
-#' Models Hi-C contacts using Negative Binomial (or Poisson when the data is underdispersed) regression. Given the fact that Hi-C data suffers from contact decay bias this method is intendent to model each diagonal separately.
-#'
-#' @param df data frame with predictor, response, outlier columns
-#' @param link character link to be used in GLM
-#' @param try.poisson logical if true then use Poisson regression instead of NB anytime warning is generated when fitting NB model indicating MLE convergence issue
-#'
-#' @return object of class glm or MASS::glm.nb
-#'
-#' @seealso \code{\link{glm}}, \code{\link{MASS::glm.nb}} to see how GLM are constructed
-#'
-#' @export
-constructGLM <- function(df, link, try.poisson = TRUE){
-  stopifnot(link %in% c("log", "sqrt"))
-  tryCatch({
-    if(link == "log"){
-      model <- MASS::glm.nb(response ~ predictor, data = df[df$outlier == "no",], link = "log")
-    } else {
-      model <- MASS::glm.nb(response ~ predictor, data = df[df$outlier == "no",], link = "sqrt")
-    }
-    if(try.poisson & !is.null(model$th.warn)){
-      if(link == "log"){
-        model <- glm(response ~ predictor, data = df[df$outlier == "no",], family = poisson(link = "log"))
-      } else {
-        model <- glm(response ~ predictor, data = df[df$outlier == "no",], family = poisson(link = "sqrt"))
-      }
-    }
-  }, error = function(e){
-    model <- NULL
-  })
-  return(model)
 }
 
 #' An S3 object to represent differential GLM Hi-C model.
@@ -325,67 +305,92 @@ constructGLM <- function(df, link, try.poisson = TRUE){
 #' Models diagonal-wise dependencies between Hi-C data sets with GLM. Model is constructed as follows:
 #' \itemize{
 #'   \item{}{merge maps1 with maps2}
-#'   \item{}{for each diagonal in diagonals}
+#'   \item{}{for each diagonal in diagonal pools}
 #'   \itemize{
 #'     \item{}{take all points from this diagonal, such that they are non zero in map1 (X) and non zero in map2 (Y)}
-#'     \item{}{remove outliers using robust regression (recommended)}
-#'     \item{}{apply transformation to predictor variable (X or Y): log or sqrt depending on link function}
-#'     \item{}{model response (Y = f(X) or X = f(Y)) using Negative Binomial distribution with appropriate link function}
+#'     \item{}{remove outliers using robust regression (only performed when \code{robust.nb} is false)}
+#'     \item{}{model response (Y = f(X) or X = f(Y)) using (robust) Negative Binomial distribution}
 #'   }
 #' }
-#' Before fitting the model it's recommended to first inspect correlations between analyzed Hi-C maps before fixing this variable. As the ratio of noise / signal in Hi-C data increases rapidly with decay it's unadvised to use all diagonals for modelling. The number of diagonals to be used will depend on chromosome length, resolution and data quality. As a rule of thumb the number of diagonals should not exceed 0.1 times length of chromosome.
+#' Before fitting the model it's recommended to first inspect correlations between analyzed Hi-C maps before fixing this variable. As the ratio of noise / signal in Hi-C data increases rapidly with decay it's unadvised to use all diagonals for modelling. The number of diagonals to be used will depend on chromosome length, resolution and data quality. One can retain uncorrelated diagonals (pools) by increasing significance threshold (\code{alpha}) for PCC significance.
 #'
 #' @param hic.comparator object of type HiCcomparator
-#' @param diagonals fraction or numeric vector or character "all" which diagonals to use to fit models, by default fraction of chromsome length is used to indicate number of diagonals.
-#' @param remove.outliers logical if true try to remove outliers before fitting proper model (NB regression) using robust regression (IRLS) with bisquare weight function
-#' @param outlier.weight numeric weight threshold to remove outliers
-#' @param link character either log or sqrt - link function for NB regression
+#' @param diag.frac fraction of diagonals to use to fit models, by default fraction of chromsome length is used to indicate number of diagonals.
+#' @param alpha significance (p-value) threshold to discard diagonals with insignificant Pearson correlation coefficient between X (contacts from contact map 1) and Y (corresponding contacts from contact map 2).
+#' @param robust.nb logical whether to use robust Negative Binomial regression as main model (see details), true by default
+#' @param remove.outliers logical only relevant if \code{robust.nb} is set to false - if true try to remove outliers (potential Differential Interactions) before model fitting (NB regression) using robust regression (IRLS) with bisquare weight function
+#' @param outlier.weight numeric weight threshold to remove outliers, 0 by default
+#' @param ncores numeric number of cores for parallel processing to speed up computations
+#' @param max.nobs numeric maximum number of observations to be used for robust NB regression model estimation (see \code{\link{constructGLM}})
+#' @param nrep number of repetitions to average parameter estimates during robust NB regression model estimation on large sample sizes (see \code{\link{constructGLM}})
 #'
 #' @return S3 object of class HiCglm
 #'
-#' @seealso \code{\link{HiCcomparator}} on how to construct HiCcomparator object and \code{\link{robustreg::robustRegBS}} on how robust regression is performed and outliers selection process
+#' @details When \code{robust.nb} is true, the model  is fitted using robust procedure developed and published by \insertCite{aeberhard2014robust}{DIADEM} - see \code{\link{constructGLM}} function for details.
+#'
+#' The main assumption behind \code{HiCglm} is that given 2 Hi-C datasets (even very different cell lines) their diagonal-wise interaction profiles will be correlated, which should manifest in X,Y plots having funnel like shape (see \code{simulate_null} function). In this setting it is further assumed (based on observed X,Y dependencies) that potential Differential Interactions will behave like outliers thereby disobeying the funnel-like pattern. The use of robust Negative Binomial regression  diminishes the influence of outliers on model fitting and allows to capture “uncontaminated” (with no DIs) null model.
+#'
+#' @seealso \code{\link{HiCcomparator}} on how to construct HiCcomparator object and \code{\link{constructGLM}}, \code{\link[robustreg]{robustRegBS}} on how GLM fitting process
 #'
 #' @examples
+#' # first create hiccomp (i.e. HiCcomparator object), then
+#' hicglm <- HiCglm(hiccomp)
+#'
+#' @references{
+#'   \insertRef{aeberhard2014robust}{DIADEM}
+#' }
+#'
+#' @importFrom Rdpack reprompt
 #'
 #' @export
-HiCglm <- function(hic.comparator, diagonals = 0.1, remove.outliers = TRUE, outlier.weight = 0, link = c("log", "sqrt")[1]){
-  stopifnot(link %in% c("log", "sqrt"))
+HiCglm <- function(hic.comparator, diag.frac = 0.5, alpha = 0.05, robust.nb = TRUE,
+                   remove.outliers = TRUE, outlier.weight = 0, ncores = 1, max.nobs = 10000,
+                   nrep = 20){
+  dc <- decay_correlation(hic.comparator, which.cors = "pearson")
   merged <- merge(hic.comparator, include.zero.cells = FALSE)
   nm <- names(merged)
   lapply(nm, function(n){
-    merged.n <- merged[[n]]
-    # split by diagonals
-    md <- split(merged.n, merged.n$diagonal)
-    if(diagonals[1] == "all"){
-      diagonals <- names(md)
-    } else if((length(diagonals) == 1) & (diagonals < 1)){
-      m <- round(diagonals * hic.comparator$maps.dims[[n]][1,1])
-      diagonals <- as.character(seq(1,m))
-    } else {
-      diagonals <- as.character(diagonals)
-    }
+    # limit number of diagonals to fraction of first diagonals
+    nd <- hic.comparator$maps.dims[[n]][1,1]
+    dp <- hic.comparator$diags.pool[[n]]
+    aggregate(diagonal ~ dpool, data = dp, function(x) max(x) / nd) %>%
+      magrittr::extract(magrittr::use_series(.,"diagonal") <= diag.frac,) %>%
+      magrittr::use_series("dpool") %>% max() -> dp.thr
+    merged.n <- base::merge(merged[[n]], dp[dp$dpool <= dp.thr,], by = c("diagonal"))
+    # split by diagonal pools
+    md <- split(merged.n, merged.n$dpool)
+    # select only this pools of diagonals, which exhibit significant correlation
+    sig.dpool <- dc[(dc$name == n) & (dc$pearson.pval <= alpha), "diagonal"]
+    dpools <- names(md)
+    dpools <- dpools[dpools %in% as.character(sig.dpool)]
     # build models
-    lapply(diagonals, function(k){
-      df <- md[[k]]
+    parallel::mclapply(md[dpools], function(df, ro, rnb, ow, mno){
       # remove outliers if required
       df$outlier <- "no"
-      if(remove.outliers){
+      if(ro & !rnb){
         tryCatch({
-          fit <- robustreg::robustRegBS(val.y ~ val.x, data = df)
-          df[which(fit$weights <= outlier.weight), "outlier"] <- "yes"
+          #fit <- robustreg::robustRegBS(val.y ~ val.x, data = df)
+          #df[which(fit$weights <= ow), "outlier"] <- "yes"
+          fit <- robustbase::lmrob(val.y ~ val.x, df, setting = "KS2014")
+          fit.summary <- summary(fit)
+          thr <- fit.summary$control$eps.outlier
+          df[fit.summary$rweights <= thr, "outlier"] <- "yes"
         }, error = function(e){
-          warning(paste0("Failed to perform IRLS for diagonal ",k))
+          warning(paste0("Failed to perform IRLS for diagonal ", df[1,"dpool"]))
         })
       }
       # build model for enrichment in Y
-      df$val.transformed.x <- get(link)(df$val.x) # transform predictor
-      model.x <- constructGLM(data.frame(predictor = df$val.transformed.x, response = df$val.y, outlier = df$outlier), link)
+      df$val.transformed.x <- log(df$val.x) # transform predictor
+      model.x <- constructGLM(data.frame(predictor = df$val.transformed.x, response = df$val.y, outlier = df$outlier),
+                              robust.nb = robust.nb, max.nobs = mno, nrep = nrep)
       # build model for enrichment in X
-      df$val.transformed.y <- get(link)(df$val.y) # transform predictor
-      model.y <- constructGLM(data.frame(predictor = df$val.transformed.y, response = df$val.x, outlier = df$outlier), link)
+      df$val.transformed.y <- log(df$val.y) # transform predictor
+      model.y <- constructGLM(data.frame(predictor = df$val.transformed.y, response = df$val.x, outlier = df$outlier),
+                              robust.nb = robust.nb, max.nobs = mno, nrep = nrep)
+      model.dpool <- magrittr::set_rownames(rbind(model.x, model.y), c("Y | X", "X | Y"))
       # results
-      list(df, model.x, model.y) %>% magrittr::set_names(c("data","model.x","model.y"))
-    }) %>% magrittr::set_names(diagonals)
+      magrittr::set_names(list(df, model.dpool), c("data","model"))
+    }, remove.outliers, robust.nb, outlier.weight, max.nobs, mc.cores = ncores) %>% magrittr::set_names(dpools)
   }) %>% magrittr::set_names(nm) -> model
   # return result
   structure(list(hic.comparator$data.names, hic.comparator$maps.dims, model) %>%
@@ -393,50 +398,18 @@ HiCglm <- function(hic.comparator, diagonals = 0.1, remove.outliers = TRUE, outl
             class = "HiCglm")
 }
 
-#' Computes significance of data given the model
-#'
-#' Uses either Negative Binomial or Poisson to calculate pvalue of Y | X or X | Y.
-#'
-#' @param dataset data frame with predictor, response, outlier columns
-#' @param model object of type glm or MASS::glm.nb class
-#'
-#' @return numeric vector with p-values (upper tail)
-#'
-#' @seealso \code{\link{pnbinom}}, \code{\link{ppois}} to see how to calculate significance
-#'
-#' @export
-significance <- function(dataset, model){
-  stopifnot(model[["family"]]$link %in% c("log", "sqrt"))
-  if(model[["family"]]$link == "log"){
-    inv.link <- function(v) exp(v)
-  }
-  if(model[["family"]]$link == "sqrt"){
-    inv.link <- function(v) v ** 2
-  }
-  mu <- predict(model, newdata = dataset)
-  mu.muhat <- cbind(dataset$response, mu)
-  sapply(1:nrow(mu.muhat), function(i){
-    if(model[["family"]]$family == "poisson"){
-      ppois(mu.muhat[i,1], inv.link(mu.muhat[i,2]), lower.tail = FALSE)
-    } else {
-      pnbinom(mu.muhat[i,1], size = model$theta, mu = inv.link(mu.muhat[i,2]), lower.tail = FALSE)
-    }
-  })
-}
-
 #' @export
 hicdiff <- function(x, ...) UseMethod("hicdiff", x)
 
 #' Computes differential (p-value/q-value) map.
 #'
-#' Given HiCglm object calculates enrichment p-values of Y | X or X | Y w.r.t. background models (separate for every diagonal, see \code{\link{HiCglm} for details}).
+#' Given HiCglm object calculates enrichment p-values of Y | X or X | Y w.r.t. background models (separate for every diagonal (pool), see \code{\link{HiCglm} for details}).
 #'
 #' @param hic.glm object of class HiCglm
-#' @param marginal.distr character wither fit or obs; if fit then fitted gamma distribution for X and Y is used to convert them to U and V respectively
 #'
 #' @return list of data frames corresponding to Hi-C contact maps; each data frame contain columns: i, j, name, val.x, val.y, pvalue.x, qvalue.x, pvalue.y, qvalue.y where suffix indicates predictor variable, i.e. pvalue.x indicates E[Y | X] model, so resulting significance means enrichment of Y w.r.t. X
 #'
-#' @seealso \code{\link{HiCglm}} on how to construct HiCglm, \code{\link{maps_difference_diagonal}} and \code{\link{significance}} on how p-values are calculated
+#' @seealso \code{\link{HiCglm}} on how to construct HiCglm, \code{\link{significance}} on how p-values are calculated
 #'
 #' @examples
 #'
@@ -445,18 +418,18 @@ hicdiff.HiCglm <- function(hic.glm){
   model <- hic.glm$model
   lapply(names(model), function(n){
     model.n <- model[[n]]
-    # compute p values for every diagonal in model
+    # compute p values for every diagonal pool in model
     lapply(names(model.n), function(k){
       l <- model.n[[k]]
-      dataset <- l[["data"]]
-      model.x <- l[["model.x"]]
-      model.y <- l[["model.y"]]
+      dataset <- l$data
+      model.x <- l$model["Y | X",]
+      model.y <- l$model["X | Y",]
       # enrichment for: Y | X
-      px <- significance(data.frame(predictor = dataset$val.transformed.x, response = dataset$val.y),
-                         l[["model.x"]])
+      px <- significance(data.frame(predictor = dataset$val.x, response = dataset$val.y),
+                         model.x)
       # enrichment for: X | Y
-      py <- significance(data.frame(predictor = dataset$val.transformed.y, response = dataset$val.x),
-                         l[["model.y"]])
+      py <- significance(data.frame(predictor = dataset$val.y, response = dataset$val.x),
+                         model.y)
       magrittr::inset(dataset, c("pvalue.x", "qvalue.x", "pvalue.y", "qvalue.y"),
                       value = cbind(px, p.adjust(px, method = "BH"), py, p.adjust(py, method = "BH")))
     }) %>% do.call("rbind",.)
@@ -511,6 +484,99 @@ hicdiff2mtx <- function(hicdiff.list, maps.dims, val.column = c("qvalue","pvalue
 }
 
 #' @export
+simulate_null <- function(x, ...) UseMethod("simulate_null", x)
+
+#' Samples interactions based on background model.
+#'
+#' Based on this method output one may plot expected vs observed plot of interactions for each diagonal pool (see examples).
+#'
+#' @param hic.glm HiCglm object
+#' @param dpools character or vector, if character "all" then use all pooled diagonals in background model, otherwise use specified subset
+#' @param N integer number of samples for every predictor value
+#'
+#' @return list of list of data frames with expected interactions, first list enumerates different maps (usually chromosomes), second list contains 2 elements refering to Y | X and X | Y models. Finally the last 2 lists contain data frames with simulated interactions.
+#'
+#' @examples
+#' # first prepare HiCglm object
+#' expected <- simulate_null(hicglm, dpools = 1:10)
+#' observed <- lapply(hicglm$model[["18"]][as.character(1:10)], function(x) x$data)
+#' observed <- do.call("rbind", observed)[c("val.x", "val.y", "dpool")]
+#' # plot results: expected vs observed
+#' ggplot(all.data, aes(x = val.x, y = val.y, color = type)) +
+#'   geom_point(size = 0.3, alpha = 0.7) +
+#'   facet_wrap(~ dpool, scales = "free", ncol = 3)
+#'
+#' @export
+simulate_null.HiCglm <- function(hic.glm, dpools = "all", N = 10){
+  lapply(names(hic.glm$model), function(n){
+    model <- hic.glm$model[[n]]
+    if(dpools[1] == "all"){
+      dpools <- names(model)
+    }
+    lapply(c("Y | X","X | Y"), function(which.model){
+      lapply(as.character(dpools), function(k){
+        l <- model[[k]]
+        dataset <- l[["data"]]
+        dispersion <- l[["model"]][which.model, "dispersion"]
+        intercept <- l[["model"]][which.model, "intercept"]
+        beta <- l[["model"]][which.model, "beta"]
+        # response | predictor: Y | X or X | Y
+        lp <- paste0("val.", tolower(unlist(strsplit(which.model, " "))[3]))
+        lr <- paste0("val.", tolower(unlist(strsplit(which.model, " "))[1]))
+        sim.contacts <- simulate_contacts(dataset[,lp], l[["model"]][which.model,], N = N)
+        names(sim.contacts) <- c(lp, lr)
+        magrittr::inset(sim.contacts[c("val.x", "val.y")], "dpool", value = k)
+      }) %>% do.call("rbind", .)
+    }) %>% magrittr::set_names(c("Y | X","X | Y"))
+  }) %>% magrittr::set_names(names(hic.glm$model))
+}
+
+#' @export
+simulate_map <- function(x, ...) UseMethod("simulate_map", x)
+
+#' Simulates maps based on background model.
+#'
+#' This function can be used to prepare artificial replicate maps (with no differential interactions) from any 2 Hi-C contact maps. To do so one must first prepare HiCglm object from any pair of contact maps (can be technical or biological replicates) and then feed it into this function. Resulting maps can be used to benchmark DI detection methods (for example by adding some artificial DI and then testing it). This approach has an advantage of producing artificial maps resembling real Hi-C data, because it keeps decay, compartment and TADs unaffected (at least to some extent).
+#'
+#' @param hic.glm HiCglm object
+#' @param dpools character or vector, if character "all" then use all pooled diagonals in background model, otherwise use specified subset
+#' @param remove.na.contacts logical if true remove NAs
+#'
+#' @return list of list of data frames with expected interactions, first list enumerates different maps (usually chromosomes), second list contains 2 elements refering to Y (simulate Y condition from X) and X (simulate X condition from Y) contact maps in sparse format.
+#'
+#' @examples
+#'
+#' @export
+simulate_map.HiCglm <- function(hic.glm, dpools = "all", remove.na.contacts = TRUE){
+  lapply(names(hic.glm$model), function(n){
+    model <- hic.glm$model[[n]]
+    if(dpools[1] == "all"){
+      dpools <- names(model)
+    }
+    lapply(c("Y | X","X | Y"), function(which.model){
+      lapply(as.character(dpools), function(k){
+        l <- model[[k]]
+        dataset <- l[["data"]]
+        # response | predictor: Y | X or X | Y
+        lp <- paste0("val.", tolower(unlist(strsplit(which.model, " "))[3]))
+        sim.contacts <- simulate_contacts(dataset[,lp], l[["model"]][which.model,], N = 1)
+        # match response val (number of contacts) with coordinates (i and j)
+        s1 <- split(dataset, dataset[,lp])
+        s2 <- split(sim.contacts, sim.contacts$predictor)
+        lapply(intersect(names(s1), names(s2)), function(x){
+          cbind(s1[[x]][c("i","j")], base::sample(s2[[x]]$response, nrow(s2[[x]])))
+        }) %>% do.call("rbind",.) %>%
+          magrittr::set_colnames(c("i", "j", "val")) -> sc
+        if(remove.na.contacts)
+          return(sc[!is.na(sc$val),])
+        else
+          return(sc)
+      }) %>% do.call("rbind", .)
+    }) %>% magrittr::set_names(c("Y","X"))
+  }) %>% magrittr::set_names(names(hic.glm$model))
+}
+
+#' @export
 differential_interactions <- function(x, ...) UseMethod("differential_interactions", x)
 
 #' Finds significantly interacting rectangle-like regions.
@@ -538,7 +604,7 @@ differential_interactions <- function(x, ...) UseMethod("differential_interactio
 #'
 #' @return list with number of entries equal to hic.glm$names; each entry is a list with 2 elements: interacting.regions - data frame containing rows with rectangle like regions of significant interactions with coordinates n.cells (number of non zero cells inside rectangle), start.x, end.x, start.y, end.y, effect; connected.components list with cells comprising given connected component; connected components list is named list where each entry name is unique id, which can be mapped to row in interacting.regions (its row names); effect column is indicating if interaction refers to Y enrichment (i.e. E[Y | X] model) or X enrichment (i.e. E[X | Y] model)
 #'
-#' @seealso \code{\link{best_fit_bilinear}} for fitting bilinear model, \code{\link{raster::raster}} and \code{\link{raster::clump}} for connected components search
+#' @seealso \code{\link{best_fit_bilinear}} for fitting bilinear model, \code{\link[raster]{raster}} and \code{\link[raster]{clump}} for connected components search
 #'
 #' @examples
 #'

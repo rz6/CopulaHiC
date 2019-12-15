@@ -639,48 +639,6 @@ move_contacts <- function(mtx.sparse, i, j, N){
   )
 }
 
-#' Produce artificial long range interactions
-#'
-#' Produces artificial long range interactions by randomly moving contacts to given interacting regions.
-#'
-#' @param mtx.sparse data frame - Hi-C contact map in sparse format with columns: i, j, val, diagonal, name
-#' @param interactions data frame with i, j, N columns indicating where (\code{i}, \code{j}) to make artificial LRI and with how many interactions (\code{N})
-#'
-#' @return data frame with the same columns as \code{mtx.sparse}
-#'
-#' @seealso \code{\link{move_contacts}} on how single artificial LRI (\code{i},\code{j}) is created
-#'
-#' @examples
-#' npz <- read_npz("/home/rafal/data/hic-normalization-40kb/raw/IMR90-MboI-1_40kb-raw.npz", mtx.names = c("18"))
-#' mtx <- npz[["18"]]
-#' # create artificial LRI data frame:
-#' interactions <- data.frame(i = c(4, 150, 386, 370, 463, 472), j = c(8, 180, 500, 390, 481, 485), N = c(30, 40, 100, 75, 40, 88))
-#' # produce contact map with artificial LRI
-#' mtx.r <- artificial_lri(mtx, interactions)
-#' m1 <- sparse2dense(mtx, N = 1952)
-#' m2 <- sparse2dense(mtx.r, N = 1952)
-#' md <- m1 - m2
-#' # see artificial LRI
-#' plot_diff_map(md, na.color = "white", breaks = 100)
-#'
-#' @export
-artificial_lri <- function(mtx.sparse, interactions){
-  bins <- unique(c(mtx.sparse$i, mtx.sparse$j))
-  sapply(seq(1, nrow(interactions)), function(x){
-    if(length(intersect(bins, interactions[x, c("i","j")])) < 2){
-      warning(paste0("No interactions for bins ", paste(interactions[x,], collapse = ","), " found in given matrix (probably unmappable region), skipping..."))
-      return(-1)
-    }
-    return(x)
-  }) -> v
-  interactions <- interactions[v[v > 0],]
-  mtx.random.lri <- mtx.sparse
-  for(x in seq(1, nrow(interactions))){
-    mtx.random.lri <- move_contacts(mtx.random.lri, interactions[x, "i"], interactions[x, "j"], interactions[x, "N"])
-  }
-  return(mtx.random.lri)
-}
-
 #' Hi-C interactions bootstrapping.
 #'
 #' Randomly samples interactions from data frame with atomic interactions into \code{length(ratio)} data frames with interactions in such a way that i-th dataframe have \code{ratio[i]} fraction of interactions of initial atomic interactions data frame.
@@ -1014,7 +972,7 @@ local.min <- function(v) which(diff(sign(diff(v))) == 2) + 1
 #'
 #' @return numeric value of first local maximum in \code{v} starting from the end of v and going left; NA if v is nonincresing starting at last element of v and going left (i.e. v is either constant or there is minmum first)
 #'
-#' @seealso \code{\link{DIADEM::local.min}}, \code{\link{DIADEM::local.max}} for finding local minma and maxima in vector v
+#' @seealso \code{\link[DIADEM]{local.min}}, \code{\link[DIADEM]{local.max}} for finding local minma and maxima in vector v
 #'
 #' @examples
 #' # maximum in 7 (index 2) starting from 1 (index 8) and moving with decreasing indices
@@ -1049,7 +1007,7 @@ left.max <- function(v){
 #'
 #' @return numeric value of first local minimum in \code{v} starting from the begining of v and going right; NA if v is nondecreasing starting at first element of v and going right (i.e. v is either constant or there is maximum first)
 #'
-#' @seealso \code{\link{DIADEM::local.min}}, \code{\link{DIADEM::local.max}} for finding local minma and maxima in vector v
+#' @seealso \code{\link[DIADEM]{local.min}}, \code{\link[DIADEM]{local.max}} for finding local minma and maxima in vector v
 #'
 #' @examples
 #' # maximum first (in 7, index 3)
@@ -1161,7 +1119,7 @@ map2tads <- function(dense.mtx, resolution = 40000, window.bp = 500 * 1000, delt
 #'
 #' @return data frame with start, end columns containing TAD intersection intervals
 #'
-#' @seealso \code{\link{intervals::Intervals}}, \code{\link{intervals::interval_intersection}} for functions used to find intersection between 2 sets of intervals
+#' @seealso \code{\link[intervals]{Intervals}}, \code{\link[intervals]{interval_intersection}} for functions used to find intersection between 2 sets of intervals
 #'
 #' @examples
 #' # simple artificial data set of TADs
@@ -1178,9 +1136,9 @@ intersect_tads <- function(tads1, tads2){
     as.data.frame() %>% magrittr::set_colnames(c("start","end"))
 }
 
-#' Extracts crosses around i,j cells of given matrix.
+#' Extracts neighborhood around i,j cells of given matrix.
 #'
-#' Given matrix \code{mtx.dense} and positive integer \code{k} it extracts cells:
+#' Given matrix \code{mtx.dense} and positive integer \code{k} it extracts cross pattern cells:
 #' \itemize{
 #'  \item{}{i - k, j}
 #'  \item{}{i, j - k}
@@ -1202,17 +1160,21 @@ intersect_tads <- function(tads1, tads2){
 #'  \item{}{i, j + k}
 #'  \item{}{i, j}
 #' }
-#' The above cells are columns in resulting data frame, so it has in total 2 + 4 * k + 1 columns: first two are cell coordinates in initial matrix, i.e.: i and j, remaining columns are the above values (in the order specified above). Selection of cross size \code{k} enforces that cells belonging to rows, columns or diagonals (starting at main diagonal) with indices 1 to \code{k} or \code{n-k+1} to \code{n} can't be assigned any value.
+#' or donut shape. The above cells are columns in resulting data frame, so it has in total 2 + 4 * k + 1 columns: first two are cell coordinates in initial matrix, i.e.: i and j, remaining columns are the above values (in the order specified above). Selection of cross size \code{k} enforces that cells belonging to rows, columns or diagonals (starting at main diagonal) with indices 1 to \code{k} or \code{n-k+1} to \code{n} can't be assigned any value.
 #'
 #' @param mtx.dense numeric symmetric matrix
-#' @param k numeric cross size
+#' @param k numeric radius size
 #' @param max.d numeric fraction of domains to be taken, i.e.: if \code{mtx.dense} is of size \code{n} (i.e. it have \code{n} diagonals) then \code{floor(max.d * n)} diagonals, starting at main diagonal will be taken and remaining will be discarded.
 #' @param m numeric how many diagonals (starting at main diagonal) to discard, by definition of cross this must be fixed to m > k to have effect as m will be finally be selected as: \code{max(k,m)}
+#' @param which.ngb character indicating the shape of neighborhood to extract, either "cross" or "donut"
+#' @param include.ij logical whether to include the value of cell for which neighborhood is extracted
 #'
 #' @examples
 #'
 #' @export
-crosses <- function(mtx.dense, k = 1, max.d = 0.15, m = 1){
+neighborhood <- function(mtx.dense, k = 1, max.d = 0.15, m = 1,
+                         which.ngb = c("cross","donut")[1], include.ij = FALSE){
+  stopifnot(which.ngb %in% c("cross","donut"))
   n <- nrow(mtx.dense)
   N <- floor(n * max.d)
   # copy matrix and zero m diagonals, k left/right and top/bottom columns and rows respectively
@@ -1237,16 +1199,322 @@ crosses <- function(mtx.dense, k = 1, max.d = 0.15, m = 1){
   idx <- which(mtx != 0, arr.ind = TRUE)
   # for each non zero cell get k cells to the left/right and k cells above/below
   if(k > 0){
+    if(which.ngb == "cross"){
+      v <- c(seq(-k,-1), seq(1,k))
+      ij.idx <- rbind(
+        data.frame(Var1 = v, Var2 = rep(0, length(v))),
+        data.frame(Var1 = 0, Var2 = 0),
+        data.frame(Var1 = rep(0, length(v)), Var2 = v)
+      )
+    }else{
+      ij.idx <- expand.grid(seq(-k,k), seq(-k,k))
+    }
+    if(!include.ij)
+      ij.idx <- ij.idx[-ceiling(nrow(ij.idx) / 2),]
+    cnms <- apply(ij.idx, 1, function(x) paste0("i", x[1], ".j", x[2]))
+    ###
     apply(idx, 1, function(x){
-      sapply(c(seq(-k,-1), seq(1,k)), function(y){
-        c(mtx.dense[x["row"]+y,x["col"]], mtx.dense[x["row"],x["col"]+y])
-      }) %>% unlist()
-    }) %>% t() %>% cbind(mtx.dense[idx]) -> ij.crosses
+      apply(ij.idx, 1, function(ij){
+        mtx.dense[x["row"] + ij[1], x["col"] + ij[2]]
+      })
+      # if(which.ngb == "cross"){
+      #   if(include.ij)
+      #     v <- seq(-k,k)
+      #   else
+      #     v <- c(seq(-k,-1), seq(1,k))
+      #   sapply(v, function(y){
+      #     c(mtx.dense[x["row"]+y,x["col"]], mtx.dense[x["row"],x["col"]+y])
+      #   }) %>% unlist()
+      # }else{
+      #   ij.idx <- expand.grid(seq(-k,k), seq(-k,k))
+      #   if(!include.ij)
+      #     ij.idx <- ij.idx[-ceiling(nrow(ij.idx) / 2),]
+      #   apply(ij.idx, 1, function(ij){
+      #     mtx.dense[x["row"] + ij[1], x["col"] + ij[2]]
+      #   })
+      # }
+    }) %>% t() %>%
+      magrittr::set_colnames(cnms) -> ij.crosses
   } else {
     mtx.dense[idx] -> ij.crosses
   }
   df <- as.data.frame(cbind(idx, ij.crosses))
-  df <- df[c("col","row", colnames(df)[3:ncol(df)])]
+  #df <- df[c("col","row", colnames(df)[3:ncol(df)])]
   colnames(df)[1:2] <- c("i","j")
   return(df)
+}
+
+#' Aggregates diagonals of based on similarity of XY distribution
+#'
+#' Merges 2 contact maps in sparse format and then aggregates it diagonals. The aggregation process is performed as follows:
+#' \itemize{
+#'   \item{}{start with k = 1 (first diagonal), group k consists of observations: val.x * val.y (from k-th diagonal)}
+#'   \item{}{take merge candidate i.e.: k' = k + 1, , group k' consists of observations: val.x * val.y (from k'-th diagonal)}
+#'   \item{}{perform chi-square test between group k and k', H0: observations from both groups come from the same distribution, H1: they come from different distributions}
+#'   \item{}{if rejected set k = k' (and pool diagonals k to k'-1 into single group), otherwise set k' = k' + 1}
+#'   \item{}{repeat until all diagonals are processed}
+#' }
+#' After algorithm is finished diagonals are assigned to groups (pools).
+#'
+#' @param mtx1.sparse data frame, contact map in sparse format
+#' @param mtx2.sparse data frame, contact map in sparse format
+#' @param agg.diags logical if false leave each diagonal in separate group (no pooling)
+#' @param alpha numeric significance threshold for chi square test
+#'
+#' @examples
+#'
+#' @export
+aggregate_diagonals <- function(mtx1.sparse, mtx2.sparse, agg.diags = TRUE, which.test = c("energy","KS")[1],
+                                alpha = 0.05, exclude.outliers = FALSE){
+  stopifnot(which.test %in% c("energy","KS"))
+  # helper function
+  get_next <- function(mtx.by.diag, k = 1, alpha = 0.05, wt = "energy", bn = 1000){
+    k.range <- names(mtx.by.diag)
+    n <- max(as.numeric(k.range))
+    df1 <- mtx.by.diag[[as.character(k)]]
+    while (TRUE) {
+      k <- k + 1
+      if(k > n){
+        return(k)
+      }
+      if(as.character(k) %in% k.range){
+        df2 <- mtx.by.diag[[as.character(k)]]
+        if(wt == "energy"){
+          # Energy test is prefered as it tackles multivariate data, unfortunately for large vectors of observations it takes long time to compute
+          #p <- cramer::cramer.test(as.matrix(df1[c("val.x","val.y")]), as.matrix(df2[c("val.x","val.y")]))$p.value
+          md1 <- as.matrix(df1[df1$outlier == "no", c("val.x","val.y")])
+          md2 <- as.matrix(df2[df2$outlier == "no", c("val.x","val.y")])
+          p <- energy::eqdist.etest(rbind(md1, md2), c(nrow(md1), nrow(md2)), R = bn)$p.value
+        } else{
+          p <- ks.test(df1$val.x * df1$val.y, df2$val.x * df2$val.y)$p.value
+        }
+        if(p <= alpha){
+          return(k)
+        }
+      }
+    }
+  }
+  ################
+  ################
+  mg <- base::merge(mtx1.sparse, mtx2.sparse, by = c("i", "j", "diagonal", "name"))
+  mg$outlier <- "no"
+  # exclude.outliers <- FALSE
+  # if(exclude.outliers){
+  #   by(mg, mg$diagonal, function(df){
+  #     tryCatch({
+  #       #fit <- robustreg::robustRegBS(val.y ~ val.x, data = df)
+  #       #df[which(fit$weights <= 0), "outlier"] <- "yes"
+  #       fit <- robustbase::lmrob(val.y ~ val.x, df, setting = "KS2014")
+  #       fit.summary <- summary(fit)
+  #       thr <- fit.summary$control$eps.outlier
+  #       df[fit.summary$rweights <= thr, "outlier"] <- "yes"
+  #     }, error = function(e){
+  #       return(df)
+  #     })
+  #     return(df)
+  #   }) %>% do.call("rbind", .) -> mg
+  # }
+  # split by diagonal
+  mgs <- split(mg, mg$diagonal)
+  diags <- as.numeric(names(mgs))
+  if(agg.diags){
+    n <- max(diags)
+    k <- 1
+    v <- c(k)
+    while(k < n){
+      k <- get_next(mgs, k = k, alpha = alpha, wt = which.test)
+      v <- c(v, k)
+    }
+    dpool <- data.frame(diagonal = diags, dpool = findInterval(diags, v))
+  } else{
+    dpool <- data.frame(diagonal = diags, dpool = diags)
+  }
+  return(dpool)
+}
+
+#' Constructs GLM to model per-diagonal Hi-C contact dependancy
+#'
+#' Models Hi-C contacts using (robust) Negative Binomial (or Poisson when the data is underdispersed) regression. Given the fact that Hi-C data suffers from contact decay bias this method is intendent to model each diagonal separately. By default this function uses robust Negative Binomial regression to model interaction dependencies.
+#'
+#' @param df data frame with predictor, response, outlier columns
+#' @param robust.nb logical whther to use robust fitting procedure (see details)
+#' @param overdisp.test.pval numeric significance threshold for testing ovedispersion
+#' @param max.nobs numeric maximum number of observations (points), i.e. sample size to be taken for robust NB regression estimation (see details)
+#' @param nrep numeric number of repetitions for subsampling (see details)
+#'
+#' @return object of class glm or MASS::glm.nb
+#'
+#' @details If \code{robust.nb} is true then this function uses robust Negative Binomial estimation method developed in \insertCite{aeberhard2014robust}{DIADEM}. This function uses the code of glmrob.nb function written by William Aeberhard, which is available at: https://github.com/williamaeberhard/glmrob.nb.
+#'
+#' At first overdispersion test is performed to decide if Negative Binomial or Poisson regression should be used. If \code{robust.nb} is true the estimation may consume huge amounts of memory for large sample sizes (like for example 400000 points). In order to prevent that whenever the sample size exceeds \code{max.nobs} initial sample is subsampled to \code{max.nobs} size and model is estimated on subsample. This procedure is repeated \code{nrep} times and final parameter estimate equals average over subsampled estimates.
+#'
+#' @seealso \code{\link{glm}}, \code{\link[MASS]{glm.nb}} to see how GLM are constructed, \code{\link[AER]{dispersiontest}} to see how overdispersion is tested
+#'
+#' @references{
+#'   \insertRef{aeberhard2014robust}{DIADEM}
+#' }
+#'
+#' @export
+constructGLM <- function(df, robust.nb = TRUE, overdisp.test.pval = 0.01, max.nobs = 20000, nrep = 10){
+  tryCatch({
+    # fit robust Poisson regression and test for overdispersion
+    model <- robustbase::glmrob(response ~ predictor, data = df[df$outlier == "no",], family = poisson(link = "log"))
+    params <- c(0, as.numeric(model$coefficients))
+    overdisp.test <- AER::dispersiontest(model)
+    if(overdisp.test$p.value <= overdisp.test.pval){
+      # overdispersion exists - fit better model - NB regression
+      if(robust.nb){
+        # check sample size
+        df.noout <- df[df$outlier == "no",]
+        if(nrow(df.noout) > max.nobs){
+          # subsample nrep times and average estimates
+          sapply(1:nrep, function(i){
+            subdf <- df.noout[sample(1:nrow(df.noout), max.nobs),]
+            model <- glmrob.nb(subdf$response, subdf$predictor,
+                               bounding.func = 'T/T', weights.on.x='none',
+                               c.tukey.beta = 4, c.tukey.sig = 4)
+            # dispersion, intercept, beta
+            as.numeric(c(model$coef[1], model$coef[2:3]))
+          }) %>% apply(1, mean) -> params
+        }else{
+          model <- glmrob.nb(df.noout$response, df.noout$predictor,
+                             bounding.func = 'T/T', weights.on.x='none',
+                             c.tukey.beta = 4, c.tukey.sig = 4)
+          # dispersion, intercept, beta
+          params <- as.numeric(c(model$coef[1], model$coef[2:3]))
+        }
+      } else{
+        model <- MASS::glm.nb(response ~ predictor, data = df[df$outlier == "no",], link = "log")
+        if(is.null(model$th.warn)){
+          # if model converged - get NB regression params, otherwise keep Poisson regression params
+          params <- c(1 / model$theta, as.numeric(model$coefficients))
+        }
+      }
+    }
+  }, error = function(e){
+    params <- c(NA, NA, NA)
+  })
+  magrittr::set_names(params, c("dispersion", "intercept", "beta"))
+}
+
+#' Computes significance of data given the model
+#'
+#' Uses either Negative Binomial or Poisson to calculate pvalue of Y | X or X | Y.
+#'
+#' @param dataset data frame with predictor, response, outlier columns
+#' @param model numeric, 3 element vector: dispersion, intercept, beta
+#'
+#' @return numeric vector with p-values (upper tail)
+#'
+#' @seealso \code{\link{pnbinom}}, \code{\link{ppois}} to see how to calculate significance
+#'
+#' @export
+significance <- function(dataset, model){
+  stopifnot(all(c("predictor","response") %in% colnames(dataset)))
+  # get model paarmeters
+  dispersion <- model["dispersion"]
+  intercept <- model["intercept"]
+  beta <- model["beta"]
+  if(is.na(dispersion)){
+    pval <- rep(NA, nrow(dataset))
+  } else if(dispersion){
+    theta <- 1 / dispersion
+    # if there is overdispersion then NB regression
+    sapply(1:nrow(dataset), function(i){
+      pnbinom(dataset[i,"response"], size = theta,
+              mu = exp(intercept + beta * log(dataset[i,"predictor"])),
+              lower.tail = FALSE)
+    }) -> pval
+  } else{
+    # if no overdispersion then poisson regression
+    sapply(1:nrow(dataset), function(i){
+      ppois(dataset[i,"response"],
+            lambda = exp(intercept + beta * log(dataset[i,"predictor"])),
+            lower.tail = FALSE)
+    }) -> pval
+  }
+  return(pval)
+}
+
+#' Simulate corresponding interactions based on given interactions vector and model.
+#'
+#' @param interaction.vector integer vector with interactions
+#' @param model numeric, 3 element vector: dispersion, intercept, beta
+#' @param N numeric number of interactions to sample for every interaction in \code{interaction.vector}
+#'
+#' @return data frame with columns: predictor (interaction.vector) and response (simulated corresponding interactions)
+#'
+#' @examples
+#'
+#' @export
+simulate_contacts <- function(interaction.vector, model, N = 1){
+  dispersion <- model["dispersion"]
+  intercept <- model["intercept"]
+  beta <- model["beta"]
+  counts <- table(interaction.vector) * N
+  lapply(names(counts), function(val){
+    n <- as.numeric(counts[val])
+    predictor <- as.numeric(val)
+    if(is.na(dispersion)){
+      response <- rep(NA, n)
+    } else if(dispersion){
+      # NB regression
+      theta <- 1 / dispersion
+      response <- rnbinom(n, size = theta,
+                          mu = exp(intercept + beta * log(predictor)))
+    } else{
+      # Poisson regression
+      response <- rpois(n, exp(intercept + beta * log(predictor)))
+    }
+    data.frame(predictor, response) %>%
+      magrittr::set_colnames(c("predictor", "response"))
+  }) %>% do.call("rbind", .)
+}
+
+#' Randomly selects cells for artificial long range interactions.
+#'
+#' Toghether with \link{\code{DIADEM::simulate_map.HiCglm}} function this can be used to create Hi-C contact maps with artificial long range differential interactions (see examples).
+#'
+#' @param mtx numeric Hi-C contact map in dense format
+#' @param N numeric number of cells to sample
+#' @param max.diag numeric specifies diagonal range to sample interactions from
+#' @param radius numeric number of cells to include in artificial interaction around (left, right, bottom, top or corners) with sampled interaction
+#' @param alri.min.dist numeric minimum distance (in number of cells left, right, bottom, top or diagonally) between any pair of sampled interactions (between their centers)
+#'
+#' @return matrix with id, i, j columns indicating artificial long range interactions
+#'
+#' @details Interaction is a square centered on i,j with height i - radius, ..., i, ..., i + radius and width j - radius, ..., j, ..., j + radius
+#'
+#' The minmum distance between any pair of interactions \code{alri.min.dist} is measured as Euclidean distance between centers of 2 intractions (like i1, j1 and i2, j2)
+#'
+#' @export
+sample_alri <- function(mtx, N = 100, max.diag = NA, radius = 1, alri.min.dist = 2 * radius + 1){
+  if(is.na(max.diag)){
+    max.diag <- nrow(mtx)
+  }
+  stopifnot(max.diag %in% 1:nrow(mtx))
+  alri <- mtx
+  i <- row(alri)
+  j <- col(alri)
+  # cut off interactions to keep proper range of diagonals and radius
+  bmtx <- lower.tri(alri) | (i + (max.diag - radius) <= j) | (i >= j - (radius + 3))
+  bmtx[1:radius,] <- TRUE
+  bmtx[, seq(ncol(alri) - radius + 1, ncol(alri))] <- TRUE
+  alri[bmtx] <- 0
+  lapply(1:N, function(x){
+    if(sum(alri) == 0){
+      return(expand.grid(x, NA, NA))
+    }
+    alri.sparse <- dense2sparse(alri)
+    sampled.ij <- as.numeric(alri.sparse[sample(nrow(alri.sparse), 1),c("i","j")])
+    # add extra radius cells
+    v <- seq(-alri.min.dist, alri.min.dist)
+    ij <- expand.grid(sapply(v, function(y) sampled.ij[1] + y),
+                      sapply(v, function(y) sampled.ij[2] + y))
+    ij <- ij[(ij[,1] >= 1) & (ij[,1] <= nrow(alri)) & (ij[,2] >= 1) & (ij[,2] <= nrow(alri)),]
+    alri[as.matrix(ij)] <<- 0
+    expand.grid(x, sapply(seq(-radius, radius), function(y) sampled.ij[1] + y),
+                sapply(seq(-radius, radius), function(y) sampled.ij[2] + y))
+  }) %>% do.call("rbind",.) %>%
+    as.matrix() %>% magrittr::set_colnames(c("id","i","j"))
 }
