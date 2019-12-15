@@ -14,11 +14,9 @@ For more information please contact r.zaborowski@mimuw.edu.pl or bartek@mimuw.ed
 
 DIADEM is R package for differential analysis of Hi-C data. It takes advantage of significant correlations of main diagonals between different Hi-C data sets (cell lines, experiments, etc.). The number of diagonals (maximum genomic distance between interacting regions) depends on chromosome and data quality but usually will equal to about 5% of total number of bins in given chromosome contact map. DIADEM uses GLM to model relationship between corresponding cells of a pair of Hi-C datasets at given genomic distance and then quantifies deviatons from the model in probabilistic way. The only required input are raw Hi-C contact map files in numpy [npz](https://kite.com/python/docs/numpy.lib.npyio.NpzFile) format.
 
-For more details, examples and quick start refer to vignette (DIADEM_vignette.html file). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual (DIADEM.pdf file).
+For more details, examples and quick start refer to vignette (invoke `vignette(package="DIADEM")`). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual (invoke `devtools::build_manual()`).
 
-The indepth description of our model together with detailed analysis and motivation will be described in manuscript (in preparation - available soon).
-
-NOTE: DIADEM_vignette.html file can't be properly rendered from within github. Therefore it is recommended to download the file (or just clone the repo) and then open it.
+The indepth description of our model together with detailed analysis and motivation is described in manuscript available at: <https://www.biorxiv.org/content/10.1101/654699v1>.
 
 ## Prerequisites ##
 -------------------
@@ -59,13 +57,13 @@ Two ways of installation are possible (both require R package [devtools](https:/
 1. from github repository:
 
     ```r
-    devtools::install_github("rz6/DIADEM", args="--recursive")
+    devtools::install_github("rz6/DIADEM", build_manual = FALSE, build_vignettes = FALSE)
     ```
 
 2. from source: clone (:warning: NOTE: it must be cloned with --recursive flag, i.e.: `git clone --recursive https://github.com/rz6/DIADEM.git`) repository - by default to directory: diadem, cd to directory containing cloned repo, open R and run:
  
     ```r
-    devtools::install("diadem")
+    devtools::install("diadem", build_vignettes = TRUE)
     ```
     
 :warning: This repository contains submodule, which must be cloned as well for package to compile. Therefore this repository MUST be cloned with --recursive flag.
@@ -78,6 +76,11 @@ Import DIADEM package and list functions inside it:
 ```r
 library("DIADEM")
 getNamespaceExports("DIADEM")
+```
+
+A good introduction with some examples and more precise description may be found in vignette. To print it call:
+```{r}
+vignette(package="DIADEM")
 ```
 
 #### Sample data ####
