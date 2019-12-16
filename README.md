@@ -14,7 +14,7 @@ For more information please contact r.zaborowski@mimuw.edu.pl or bartek@mimuw.ed
 
 DIADEM is R package for differential analysis of Hi-C data. It takes advantage of significant correlations of main diagonals between different Hi-C data sets (cell lines, experiments, etc.). The number of diagonals (maximum genomic distance between interacting regions) depends on chromosome and data quality but usually will equal to about 5% of total number of bins in given chromosome contact map. DIADEM uses GLM to model relationship between corresponding cells of a pair of Hi-C datasets at given genomic distance and then quantifies deviatons from the model in probabilistic way. The only required input are raw Hi-C contact map files in numpy [npz](https://kite.com/python/docs/numpy.lib.npyio.NpzFile) format.
 
-For more details, examples and quick start refer to vignette (invoke `browseVignettes(package="DIADEM")`). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual (invoke `devtools::build_manual(path="~/")` - set path to where maunal should be produced).
+For more details, examples and quick start refer to vignette (invoke `browseVignettes(package="DIADEM")`). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual - to produce it invoke from command line `R CMD Rd2pdf path-to-package-directory` specifying path to where the package has been installed, usually something like ~/R/x86_64-pc-linux-gnu-library/3.6.2/DIADEM. This will create reference manual file DIADEM.pdf in directory where you invoked building command.
 
 The indepth description of our model together with detailed analysis and motivation is described in manuscript available at: <https://www.biorxiv.org/content/10.1101/654699v1>.
 
@@ -88,6 +88,8 @@ A good introduction with some examples and more precise description may be found
 ```{r}
 browseVignettes(package="DIADEM")
 ```
+
+If the above will not render the vignette you can find it in your package installation directory (typically something like ~/R/x86_64-pc-linux-gnu-library/3.6.2/DIADEM) under doc/DIADEM.html path.
 
 #### Sample data ####
 
