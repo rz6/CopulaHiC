@@ -12,8 +12,8 @@ HiCglm(
   remove.outliers = TRUE,
   outlier.weight = 0,
   ncores = 1,
-  max.nobs = 20000,
-  nrep = 10
+  max.nobs = 10000,
+  nrep = 20
 )
 }
 \arguments{

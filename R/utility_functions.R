@@ -1473,7 +1473,7 @@ simulate_contacts <- function(interaction.vector, model, N = 1){
 
 #' Randomly selects cells for artificial long range interactions.
 #'
-#' Toghether with \link{\code{DIADEM::simulate_map.HiCglm}} function this can be used to create Hi-C contact maps with artificial long range differential interactions (see examples).
+#' Toghether with \code{\link{DIADEM::simulate_map.HiCglm}} function this can be used to create Hi-C contact maps with artificial long range differential interactions (see examples).
 #'
 #' @param mtx numeric Hi-C contact map in dense format
 #' @param N numeric number of cells to sample

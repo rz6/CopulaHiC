@@ -3,8 +3,8 @@ title: "DiADeM: differential analysis via dependency modelling of chromatin inte
 author: "Rafal Zaborowski"
 date: "`r Sys.Date()`"
 output:
-  #rmarkdown::html_vignette:
   bookdown::html_document2:
+    base_format: rmarkdown::html_vignette
     number_sections: true
     toc: yes
     fig_caption: yes
@@ -46,6 +46,9 @@ Load the package:
 ```{r, eval=TRUE, echo=TRUE}
 library("DIADEM")
 library("magrittr")
+library("ggplot2")
+library("reshape2")
+
 
 data(sample_hic_data, package = "DIADEM")
 
@@ -125,8 +128,6 @@ plot_with_inset(list(dense.msc), c(600,1000), c(600,1000), args.regions = list(t
 ## Coverage and decays
 Compare coverage and decays for IMR90 and MSC, for decays use log10 scales for both X and Y axis:
 ```{r, eval=TRUE, echo=TRUE, out.width="100%", fig.cap=c("Coverage comparison between IMR90 and MSC Hi-C data of human chromosome 21.","Decay comparison between IMR90 and MSC Hi-C data of human chromosome 21.")}
-library("ggplot2")
-
 coverage <- dominating_signal(hic.comparator, which.signal = "coverage")
 
 ggplot(coverage, aes(x = i, y = sum.contacts, color = dataset)) +
@@ -170,8 +171,6 @@ plot_with_inset(list(dense.diff, breaks = 100, sqrt.transform = TRUE),
 ## Diagonal correlations
 Check the correlations between corresponding diagonals of IMR90 and MSC:
 ```{r, eval=TRUE, echo=TRUE, out.width="100%", fig.cap="Correlations (top) and their respective significances (bottom) between diagonals of IMR90 and MSC Hi-C data of human chromosome 21."}
-library("reshape2")
-
 decay.cor <- decay_correlation(hic.comparator, pooled = FALSE)
 dc <- decay.cor[decay.cor$name == "21",]
 dc <- dc[dc$diagonal > 0,]

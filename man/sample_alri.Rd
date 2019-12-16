@@ -27,7 +27,7 @@ sample_alri(
 matrix with id, i, j columns indicating artificial long range interactions
 }
 \description{
-Toghether with \link{\code{DIADEM::simulate_map.HiCglm}} function this can be used to create Hi-C contact maps with artificial long range differential interactions (see examples).
+Toghether with \code{\link{DIADEM::simulate_map.HiCglm}} function this can be used to create Hi-C contact maps with artificial long range differential interactions (see examples).
 }
 \details{
 Interaction is a square centered on i,j with height i - radius, ..., i, ..., i + radius and width j - radius, ..., j, ..., j + radius
