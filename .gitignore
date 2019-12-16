@@ -3,3 +3,9 @@ doc
 .R*
 .Rproj.user
 inst/doc
+vignettes/*.html
+vignettes/*.pdf
+*_cache/
+/cache/
+*.utf8.md
+*.knit.md
