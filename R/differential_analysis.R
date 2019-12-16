@@ -345,7 +345,7 @@ decay_correlation.HiCcomparator <- function(hic.comparator,
 #' @export
 HiCglm <- function(hic.comparator, diag.frac = 0.5, alpha = 0.05, robust.nb = TRUE,
                    remove.outliers = TRUE, outlier.weight = 0, ncores = 1, max.nobs = 10000,
-                   nrep = 20){
+                   nrep = 10){
   dc <- decay_correlation(hic.comparator, which.cors = "pearson")
   merged <- merge(hic.comparator, include.zero.cells = FALSE)
   nm <- names(merged)
