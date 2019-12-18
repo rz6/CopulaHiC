@@ -330,7 +330,7 @@ decay_correlation.HiCcomparator <- function(hic.comparator,
 #'
 #' The main assumption behind \code{HiCglm} is that given 2 Hi-C datasets (even very different cell lines) their diagonal-wise interaction profiles will be correlated, which should manifest in X,Y plots having funnel like shape (see \code{simulate_null} function). In this setting it is further assumed (based on observed X,Y dependencies) that potential Differential Interactions will behave like outliers thereby disobeying the funnel-like pattern. The use of robust Negative Binomial regression  diminishes the influence of outliers on model fitting and allows to capture “uncontaminated” (with no DIs) null model.
 #'
-#' @seealso \code{\link{HiCcomparator}} on how to construct HiCcomparator object and \code{\link{constructGLM}}, \code{\link[robustreg]{robustRegBS}} on how GLM fitting process
+#' @seealso \code{\link{HiCcomparator}} on how to construct HiCcomparator object and \code{\link{constructGLM}}, \code{\link[robustbase]{lmrob}} on how eventual outlier removal procedure.
 #'
 #' @examples
 #' # first create hiccomp (i.e. HiCcomparator object), then
