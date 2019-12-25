@@ -16,7 +16,7 @@ DIADEM is R package for differential analysis of Hi-C data. It takes advantage o
 
 For more details, examples and quick start refer to vignette (invoke `browseVignettes(package="DIADEM")`). You can also browse documentation of individual functions or objects within the package using standard R syntax (i.e.: `help(foo)` or `?foo`) or have a look at reference manual - to produce it invoke from command line `R CMD Rd2pdf path-to-package-directory` specifying path to where the package has been installed, usually something like ~/R/x86_64-pc-linux-gnu-library/3.6.2/DIADEM. This will create reference manual file DIADEM.pdf in directory where you invoked building command.
 
-The indepth description of our model together with detailed analysis and motivation is described in manuscript available at: <https://www.biorxiv.org/content/10.1101/654699v1>.
+The indepth description of our model together with detailed analysis and motivation is described in manuscript available at: <https://www.biorxiv.org/content/10.1101/654699v3>.
 
 ## Prerequisites ##
 -------------------
